@@ -33,6 +33,8 @@ export type SpreadProps = {
   /** Convenience: render a built-in glowing orb as the figure. */
   orb?: boolean;
   side?: 'left' | 'right';
+  /** Absolute left offset (set by the visual layout editor when you drag). */
+  x?: number;
   width?: number;
   height?: number;
   top?: number;
@@ -63,6 +65,7 @@ export function Spread({
   alt = '',
   orb = false,
   side = 'right',
+  x,
   width = 240,
   height = 240,
   top = 6,
@@ -87,7 +90,7 @@ export function Spread({
   }
 
   const obstacles: FlowObstacle[] = node
-    ? [{ id: 'spread-figure', side, shape, width, height, top, gap, node }]
+    ? [{ id: 'spread-figure', side, x, shape, width, height, top, gap, node }]
     : [];
 
   return <RichFlow runs={runs} obstacles={obstacles} fallback={children} />;

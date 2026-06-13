@@ -45,6 +45,9 @@ export type FlowObstacle = {
   width: number;
   height: number;
   top: number;
+  /** Absolute left offset within the column. Overrides `side` when set —
+   *  this is what the visual layout editor sets when you drag the figure. */
+  x?: number;
   gap?: number;
   node: ReactNode;
 };
@@ -144,7 +147,7 @@ export function RichFlow({
       const circles: CircleObstacle[] = [];
       for (const o of obstacles) {
         const gap = o.gap ?? 24;
-        const x = o.side === 'left' ? 0 : containerWidth - o.width;
+        const x = o.x ?? (o.side === 'left' ? 0 : containerWidth - o.width);
         if (o.shape === 'circle') {
           circles.push({
             cx: x + o.width / 2,
@@ -260,7 +263,7 @@ export function RichFlow({
             style={{
               position: 'absolute',
               top: o.top,
-              [o.side]: 0,
+              ...(o.x != null ? { left: o.x } : { [o.side]: 0 }),
               width: o.width,
               height: o.height,
             }}

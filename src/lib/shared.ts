@@ -1,11 +1,12 @@
-export const appName = 'My App';
+export const appName = 'docs.dev';
 export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';
 export const docsContentRoute = '/llms.mdx/docs';
 
-// fill this with your actual GitHub info, for example:
+// Default GitHub target for the admin editor's "Publish" action. The branch is
+// overridable in the admin UI (and persisted per-browser in IndexedDB).
 export const gitConfig = {
-  user: 'fuma-nama',
-  repo: 'fumadocs',
+  user: 'keyboard-dev',
+  repo: 'docs.dev',
   branch: 'main',
 };
