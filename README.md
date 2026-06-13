@@ -54,6 +54,24 @@ pnpm dev        # http://localhost:3000
   and a code block).
 - `/docs` — the standard Fumadocs docs site (search, nav, MDX).
 
+## Deploy
+
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/keyboard-dev/docs.dev)
+
+Netlify auto-detects Next.js; `netlify.toml` pins Node 22, the Next plugin, and
+ships the `content/` files with the functions (the admin editor reads them at
+request time). After connecting the repo, set these in **Site settings →
+Environment variables**:
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `GITHUB_PAT` | to publish | Token with `contents: write` on the repo. Used server-side only. |
+| `ADMIN_PIN` | optional | Admin editor PIN (defaults to `1234`). |
+| `GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_BRANCH` | optional | Publish target (defaults to `gitConfig` in `src/lib/shared.ts`). |
+
+The public docs are statically built, so they work with no env vars at all —
+the variables only power the `/admin` editor's publish flow.
+
 ## Status
 
 Early. The Fumadocs content/search/nav layer is the proven 90%; the pretext

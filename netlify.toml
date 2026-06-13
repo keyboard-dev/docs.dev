@@ -1,0 +1,24 @@
+# Netlify deployment config for docs.dev (Next.js 16 + Fumadocs).
+#
+# Netlify auto-detects Next.js and installs @netlify/plugin-nextjs (declared
+# below so it's explicit). Set the env vars in Site settings → Environment:
+#   ADMIN_PIN     admin editor PIN          (optional, defaults to 1234)
+#   GITHUB_PAT    token with contents:write (required to publish edits)
+#   GITHUB_OWNER  repo owner                (optional, defaults to gitConfig)
+#   GITHUB_REPO   repo name                 (optional)
+#   GITHUB_BRANCH branch to commit to       (optional, defaults to main)
+
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# The admin editor reads the published .mdx files at request time for the
+# baseline content, so ship them with the serverless functions.
+[functions]
+  included_files = ["content/**"]
