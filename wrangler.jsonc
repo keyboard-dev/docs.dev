@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "docs-dev",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  // nodejs_compat provides node:crypto / Buffer, which the admin auth uses.
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // Set secrets with `wrangler secret put GITHUB_PAT` (and ADMIN_PIN etc.).
+  // Non-secret defaults can live here:
+  "vars": {
+    "GITHUB_OWNER": "keyboard-dev",
+    "GITHUB_REPO": "docs.dev",
+    "GITHUB_BRANCH": "claude/charming-clarke-7l1ric"
+  }
+}

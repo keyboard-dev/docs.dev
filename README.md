@@ -56,21 +56,40 @@ pnpm dev        # http://localhost:3000
 
 ## Deploy
 
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/keyboard-dev/docs.dev)
+### Cloudflare Workers (primary)
 
-Netlify auto-detects Next.js; `netlify.toml` pins Node 22, the Next plugin, and
-ships the `content/` files with the functions (the admin editor reads them at
-request time). After connecting the repo, set these in **Site settings →
-Environment variables**:
+Runs on Workers via [OpenNext](https://opennext.js.org/cloudflare). No
+filesystem is used at runtime — baseline content comes from a build-time
+manifest (`scripts/gen-content-manifest.mjs`) and edits persist via the GitHub
+API — and `node:crypto`/`Buffer` work under the `nodejs_compat` flag set in
+`wrangler.jsonc`.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `GITHUB_PAT` | to publish | Token with `contents: write` on the repo. Used server-side only. |
-| `ADMIN_PIN` | optional | Admin editor PIN (defaults to `1234`). |
-| `GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_BRANCH` | optional | Publish target (defaults to `gitConfig` in `src/lib/shared.ts`). |
+```bash
+pnpm cf:preview     # build + run the worker locally (workerd)
+pnpm cf:deploy      # build + wrangler deploy
+```
 
-The public docs are statically built, so they work with no env vars at all —
-the variables only power the `/admin` editor's publish flow.
+Set runtime secrets (not committed):
+
+```bash
+wrangler secret put GITHUB_PAT      # token with contents:write — required to publish
+wrangler secret put ADMIN_PIN       # optional, defaults to 1234
+```
+
+`GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_BRANCH` are non-secret `vars` in
+`wrangler.jsonc`. The public docs need no env vars; the variables only power
+the `/admin` editor's publish flow.
+
+> **Note:** Fumadocs' `proxy.ts` (Next 16 middleware for `.md` content
+> negotiation) is parked as `_proxy.ts.disabled` because OpenNext doesn't yet
+> bundle Next 16's `proxy` convention. The `/llms.*` routes still serve
+> markdown; restore `proxy.ts` once the adapter supports it.
+
+### Netlify (alternative)
+
+`netlify.toml` is included (Node 22 + Next plugin). Set the same env vars in
+**Site settings → Environment variables**. The content manifest means the
+`included_files` workaround is no longer required.
 
 ## Status
 
