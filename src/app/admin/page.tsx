@@ -211,8 +211,11 @@ export default function AdminPage() {
             </option>
           ))}
         </select>
-        <a href={`/docs/${slug}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: orange }}>
-          View page ↗
+        <a href={`/admin/preview?slug=${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: orange, fontWeight: 600 }}>
+          Preview draft ↗
+        </a>
+        <a href={`/docs/${slug}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#888' }}>
+          View published ↗
         </a>
         {hasDraft && (
           <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 999, background: 'rgba(232,117,59,0.15)', color: orange }}>
