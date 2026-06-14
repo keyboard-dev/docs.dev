@@ -22,6 +22,7 @@ import {
 } from '@/lib/drafts';
 import { applyEdits, enablePlainTextEditing, type InlineEditController } from './inline-edit-dom';
 import { LivePreview } from './live-preview';
+import { LayoutEditor } from '@/app/admin/layout-editor';
 
 // Themeable accent — override --docsdev-accent in your CSS to rebrand.
 const orange = 'var(--docsdev-accent, #e8753b)';
@@ -45,6 +46,8 @@ export function InlineEditor() {
   const [publishing, setPublishing] = useState(false);
   const [inlineMode, setInlineMode] = useState(false);
   const [showDraft, setShowDraft] = useState(true);
+  const [pageShowsDraft, setPageShowsDraft] = useState(true);
+  const [drawerMode, setDrawerMode] = useState<'markdown' | 'layout'>('markdown');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inlineCtl = useRef<InlineEditController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -78,9 +81,27 @@ export function InlineEditor() {
     }
   }, [slug]);
 
+  // Load the draft for this page once we know the user is an admin, so the
+  // page can render the draft persistently (not just while the drawer is open).
   useEffect(() => {
-    if (open) void loadContent();
-  }, [open, loadContent]);
+    if (admin) void loadContent();
+  }, [admin, loadContent]);
+
+  // Persist any changes immediately (used by drawer textarea + layout editor).
+  function saveContent(next: string) {
+    setContent(next);
+    if (slug == null) return;
+    if (next === published) {
+      void deleteDraft(slug);
+      void deleteInlineEdits(slug);
+      setHasDraft(false);
+      setStatus('');
+    } else {
+      void putDraft(slug, next);
+      setHasDraft(true);
+      setStatus('Draft saved locally.');
+    }
+  }
 
   // Inline (click-to-edit) mode: edits are keyed by the block's published text
   // (an EditsMap), so they re-apply to the page when you come back.
@@ -211,6 +232,16 @@ export function InlineEditor() {
     }
   }
 
+  async function discardDraft() {
+    if (slug == null) return;
+    await deleteDraft(slug);
+    await deleteInlineEdits(slug);
+    setContent(published);
+    setHasDraft(false);
+    setPageShowsDraft(true);
+    setStatus('Draft discarded.');
+  }
+
   if (!admin || slug == null) return null;
   const dirty = content !== published;
 
@@ -257,6 +288,30 @@ export function InlineEditor() {
         </div>
       )}
 
+      {!open && !inlineMode && hasDraft && (
+        <button
+          onClick={() => setPageShowsDraft((v) => !v)}
+          title="This page has an unpublished draft"
+          style={{
+            position: 'fixed',
+            left: 20,
+            bottom: 20,
+            zIndex: 60,
+            padding: '8px 14px',
+            borderRadius: 999,
+            border: `1px solid ${orange}`,
+            background: pageShowsDraft ? orange : 'white',
+            color: pageShowsDraft ? 'white' : orange,
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: '0 6px 20px rgba(0,0,0,0.18)',
+            cursor: 'pointer',
+          }}
+        >
+          ● {pageShowsDraft ? 'Showing draft' : 'Showing published'}
+        </button>
+      )}
+
       {!open && !inlineMode && (
         <div style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 60, display: 'flex', gap: 10 }}>
           <button
@@ -294,8 +349,9 @@ export function InlineEditor() {
         </div>
       )}
 
-      {/* Live-render the draft into the page while the drawer is open. */}
-      {open && <LivePreview content={content} />}
+      {/* Render the draft into the page: live while editing, and persistently
+          afterwards (until you publish, discard, or toggle to published). */}
+      {(open || (hasDraft && pageShowsDraft && !inlineMode)) && <LivePreview content={content} />}
 
       {open && (
         <aside
@@ -334,31 +390,57 @@ export function InlineEditor() {
             </span>
           </header>
 
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => onEdit(e.target.value)}
-            onDrop={(e) => {
-              if (e.dataTransfer.files.length) {
-                e.preventDefault();
-                void handleFiles(e.dataTransfer.files);
-              }
-            }}
-            spellCheck={false}
-            style={{
-              flex: 1,
-              margin: 0,
-              padding: 16,
-              border: 'none',
-              outline: 'none',
-              resize: 'none',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-              fontSize: 13,
-              lineHeight: 1.6,
-              background: 'transparent',
-              color: 'inherit',
-            }}
-          />
+          <div style={{ display: 'flex', gap: 6, padding: '8px 12px', borderBottom: '1px solid rgba(127,127,127,0.15)' }}>
+            {(['markdown', 'layout'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setDrawerMode(m)}
+                style={{
+                  fontSize: 12,
+                  padding: '5px 12px',
+                  borderRadius: 7,
+                  border: `1px solid ${drawerMode === m ? orange : 'rgba(127,127,127,0.4)'}`,
+                  background: drawerMode === m ? orange : 'transparent',
+                  color: drawerMode === m ? 'white' : 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                {m === 'layout' ? 'Layout (drag)' : 'Markdown'}
+              </button>
+            ))}
+          </div>
+
+          {drawerMode === 'markdown' ? (
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => onEdit(e.target.value)}
+              onDrop={(e) => {
+                if (e.dataTransfer.files.length) {
+                  e.preventDefault();
+                  void handleFiles(e.dataTransfer.files);
+                }
+              }}
+              spellCheck={false}
+              style={{
+                flex: 1,
+                margin: 0,
+                padding: 16,
+                border: 'none',
+                outline: 'none',
+                resize: 'none',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                fontSize: 13,
+                lineHeight: 1.6,
+                background: 'transparent',
+                color: 'inherit',
+              }}
+            />
+          ) : (
+            <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+              <LayoutEditor content={content} onApply={saveContent} />
+            </div>
+          )}
 
           <input
             ref={fileInputRef}
@@ -395,6 +477,14 @@ export function InlineEditor() {
             >
               📎 Upload image
             </button>
+            {hasDraft && (
+              <button
+                onClick={discardDraft}
+                style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(127,127,127,0.4)', background: 'transparent', color: 'inherit', fontSize: 13, cursor: 'pointer' }}
+              >
+                Discard draft
+              </button>
+            )}
             {status && <span style={{ fontSize: 12, color: '#888', wordBreak: 'break-word' }}>{status}</span>}
           </footer>
         </aside>
