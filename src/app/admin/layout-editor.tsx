@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RichFlow, type FlowObstacle } from '@/components/pretext/rich-flow';
 import type { Run } from '@/components/pretext/extract-runs';
+import { DraftImage } from '@/components/draft-image';
+import { putAsset } from '@/lib/drafts';
 import {
   findSpread,
   writeSpreadAttrs,
@@ -65,6 +67,7 @@ export function LayoutEditor({
     height: 220,
   });
   const dragRef = useRef<Drag>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Mirror of `geo` that's always current, so drag-end (a stale closure over
   // state) commits the dragged geometry rather than the value at drag-start.
   const geoRef = useRef(geo);
@@ -125,8 +128,7 @@ export function LayoutEditor({
     node: isCircle ? (
       <Orb />
     ) : sm.attrs.image ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <DraftImage
         src={sm.attrs.image}
         alt={sm.attrs.alt ?? ''}
         style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }}
@@ -135,6 +137,40 @@ export function LayoutEditor({
       <div style={{ width: '100%', height: '100%', borderRadius: 12, background: '#0d1117' }} />
     ),
   };
+
+  function readDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(file);
+    });
+  }
+
+  // Upload an image and make it the Spread's figure (replacing the orb), keeping
+  // the current position/size so it's immediately draggable.
+  async function handleUpload(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    const dataUrl = await readDataUrl(file);
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+    const path = `/uploads/${Date.now()}-${safe}`;
+    await putAsset({ path, contentType: file.type, dataUrl });
+    userTouched.current = true;
+    const g = geoRef.current;
+    onApply(
+      writeSpreadAttrs(content, {
+        ...sm.attrs,
+        orb: undefined,
+        image: path,
+        alt: file.name,
+        side: g.x + g.width / 2 < width / 2 ? 'left' : 'right',
+        x: g.x,
+        top: g.top,
+        width: g.width,
+        height: g.height,
+      }),
+    );
+  }
 
   function onPointerMove(e: PointerEvent) {
     const d = dragRef.current;
@@ -191,10 +227,29 @@ export function LayoutEditor({
 
   return (
     <div>
-      <p style={{ fontSize: 13, color: '#888', marginBottom: 10 }}>
-        Drag the figure to move it · drag the corner to resize · text reflows live. Release to write
-        the position back into the source.
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+        <p style={{ fontSize: 13, color: '#888', margin: 0, flex: 1 }}>
+          Drag the figure to move it · drag the corner to resize · text reflows live. Release to
+          write the position back into the source.
+        </p>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #ccc', background: 'transparent', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          📎 {sm.attrs.image ? 'Replace image' : 'Upload image'}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleUpload(f);
+            e.target.value = '';
+          }}
+        />
+      </div>
       <div
         ref={wrapRef}
         style={{

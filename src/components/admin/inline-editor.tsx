@@ -21,6 +21,7 @@ import {
   setInlineEdits,
 } from '@/lib/drafts';
 import { applyEdits, enablePlainTextEditing, type InlineEditController } from './inline-edit-dom';
+import { LivePreview } from './live-preview';
 
 // Themeable accent — override --docsdev-accent in your CSS to rebrand.
 const orange = 'var(--docsdev-accent, #e8753b)';
@@ -292,6 +293,9 @@ export function InlineEditor() {
           </button>
         </div>
       )}
+
+      {/* Live-render the draft into the page while the drawer is open. */}
+      {open && <LivePreview content={content} />}
 
       {open && (
         <aside
