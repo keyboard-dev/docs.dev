@@ -27,6 +27,25 @@ import { LayoutEditor } from '@/app/admin/layout-editor';
 // Themeable accent — override --docsdev-accent in your CSS to rebrand.
 const orange = 'var(--docsdev-accent, #e8753b)';
 
+// Components the inline editor can insert. `upload` items open the file picker.
+type AddItem = { label: string; snippet?: string; upload?: 'image' | 'spread' };
+const ADD_ITEMS: AddItem[] = [
+  { label: 'Heading', snippet: '\n\n## New section\n\n' },
+  { label: 'Callout', snippet: '\n\n<Callout type="info">\nYour note here.\n</Callout>\n\n' },
+  { label: 'Card grid', snippet: '\n\n<Cards>\n  <Card title="Title" href="/" />\n</Cards>\n\n' },
+  {
+    label: 'Tabs',
+    snippet:
+      '\n\n<Tabs items={[\'One\', \'Two\']}>\n\n```ts tab="One"\nconst a = 1;\n```\n\n```ts tab="Two"\nconst b = 2;\n```\n\n</Tabs>\n\n',
+  },
+  { label: 'Code block', snippet: '\n\n```ts title="example.ts"\nconst x = 1;\n```\n\n' },
+  { label: 'Install tabs', snippet: '\n\n```package-install\nreact\n```\n\n' },
+  { label: 'Divider', snippet: '\n\n---\n\n' },
+  { label: 'Image…', upload: 'image' },
+  { label: 'Spread (orb)', snippet: '\n\n<Spread orb side="right" width={220} height={220}>\n\nYour prose flows around the orb.\n\n</Spread>\n\n' },
+  { label: 'Spread w/ image…', upload: 'spread' },
+];
+
 // "/docs" -> "", "/docs/reading-experience" -> "reading-experience"
 function slugFromPath(pathname: string): string | null {
   if (!pathname.startsWith('/docs')) return null;
@@ -48,6 +67,8 @@ export function InlineEditor() {
   const [showDraft, setShowDraft] = useState(true);
   const [pageShowsDraft, setPageShowsDraft] = useState(true);
   const [drawerMode, setDrawerMode] = useState<'markdown' | 'layout'>('markdown');
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const uploadModeRef = useRef<'image' | 'spread'>('image');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inlineCtl = useRef<InlineEditController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -252,11 +273,22 @@ export function InlineEditor() {
     });
   }
 
-  // Store uploaded images locally and insert markdown at the cursor.
+  // Insert an MDX snippet at the textarea cursor (or end), saving the draft.
+  function insertSnippet(snippet: string) {
+    const ta = textareaRef.current;
+    const at = ta ? ta.selectionStart : content.length;
+    const next = content.slice(0, at) + snippet + content.slice(at);
+    saveContent(next);
+    setAddMenuOpen(false);
+    setDrawerMode('markdown');
+  }
+
+  // Store uploaded images locally and insert markdown (or a Spread) at the cursor.
   async function handleFiles(files: FileList | File[]) {
     const ta = textareaRef.current;
     const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
     if (list.length === 0) return;
+    const asSpread = uploadModeRef.current === 'spread';
     let working = content;
     let insertAt = ta ? ta.selectionStart : working.length;
     for (const file of list) {
@@ -264,12 +296,15 @@ export function InlineEditor() {
       const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
       const path = `/uploads/${Date.now()}-${safe}`;
       await putAsset({ path, contentType: file.type, dataUrl });
-      const snippet = `\n\n![${file.name}](${path})\n\n`;
+      const snippet = asSpread
+        ? `\n\n<Spread image="${path}" alt="${file.name}" side="right" width={240} height={240}>\n\nDescribe this image — the prose here flows around it.\n\n</Spread>\n\n`
+        : `\n\n![${file.name}](${path})\n\n`;
       working = working.slice(0, insertAt) + snippet + working.slice(insertAt);
       insertAt += snippet.length;
     }
-    onEdit(working);
-    setStatus('Image added to draft.');
+    uploadModeRef.current = 'image';
+    saveContent(working);
+    setStatus(asSpread ? 'Spread with image added to draft.' : 'Image added to draft.');
   }
 
   // Collect uploaded assets referenced by the current content, for publishing.
@@ -549,8 +584,42 @@ export function InlineEditor() {
             >
               {publishing ? 'Publishing…' : 'Publish to GitHub'}
             </button>
+
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setAddMenuOpen((v) => !v)}
+                style={{ padding: '10px 14px', borderRadius: 8, border: `1px solid ${orange}`, background: 'transparent', color: orange, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                ＋ Add
+              </button>
+              {addMenuOpen && (
+                <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 6, minWidth: 190, background: 'var(--color-fd-background, #fff)', border: '1px solid rgba(127,127,127,0.3)', borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 70 }}>
+                  {ADD_ITEMS.map((it) => (
+                    <button
+                      key={it.label}
+                      onClick={() => {
+                        if (it.upload) {
+                          uploadModeRef.current = it.upload;
+                          setAddMenuOpen(false);
+                          fileInputRef.current?.click();
+                        } else {
+                          insertSnippet(it.snippet!);
+                        }
+                      }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', border: 'none', background: 'transparent', color: 'inherit', fontSize: 13, cursor: 'pointer' }}
+                    >
+                      {it.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                uploadModeRef.current = 'image';
+                fileInputRef.current?.click();
+              }}
               style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(127,127,127,0.4)', background: 'transparent', color: 'inherit', fontSize: 13, cursor: 'pointer' }}
             >
               📎 Upload image
