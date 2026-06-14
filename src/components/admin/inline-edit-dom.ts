@@ -8,7 +8,12 @@
  * code, or are duplicated) are left alone and keep using the drawer editor.
  */
 
-const EDITABLE = 'article p, article h1, article h2, article h3, article h4, article li';
+// Code blocks (<pre>) are included: their rendered text is a verbatim slice of
+// the source between the fences, so editing replaces just the code body and
+// leaves the ``` fences, title, and highlight meta untouched. Generated blocks
+// (e.g. package-install → "npm install …") aren't verbatim in the source, so
+// the uniqueness guard below skips them automatically.
+const EDITABLE = 'article p, article h1, article h2, article h3, article h4, article li, article pre';
 const MIN_LEN = 3;
 
 export type InlineEditController = {
