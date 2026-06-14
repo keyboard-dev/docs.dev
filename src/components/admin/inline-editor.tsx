@@ -491,6 +491,9 @@ export function InlineEditor() {
               </span>
             )}
             <span style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
+              <a href={`/admin/edit?slug=${encodeURIComponent(slug)}`} style={{ fontSize: 12, color: orange, fontWeight: 600 }}>
+                Open editor ↗
+              </a>
               <a href={`/admin/preview?slug=${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: orange }}>
                 Preview ↗
               </a>
