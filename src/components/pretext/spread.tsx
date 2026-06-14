@@ -22,6 +22,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { RichFlow, type FlowObstacle } from './rich-flow';
 import { extractRuns } from './extract-runs';
+import { DraftImage } from '@/components/draft-image';
 
 export type SpreadProps = {
   children: ReactNode;
@@ -80,8 +81,7 @@ export function Spread({
     shape = 'circle';
   } else if (!node && image) {
     node = (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <DraftImage
         src={image}
         alt={alt}
         style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }}
