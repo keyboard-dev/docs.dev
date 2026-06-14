@@ -10,10 +10,20 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { deleteDraft, getAsset, getDraft, putAsset, putDraft } from '@/lib/drafts';
-import { enablePlainTextEditing, type InlineEditController } from './inline-edit-dom';
+import {
+  deleteDraft,
+  deleteInlineEdits,
+  getAsset,
+  getDraft,
+  getInlineEdits,
+  putAsset,
+  putDraft,
+  setInlineEdits,
+} from '@/lib/drafts';
+import { applyEdits, enablePlainTextEditing, type InlineEditController } from './inline-edit-dom';
 
-const orange = '#e8753b';
+// Themeable accent — override --docsdev-accent in your CSS to rebrand.
+const orange = 'var(--docsdev-accent, #e8753b)';
 
 // "/docs" -> "", "/docs/reading-experience" -> "reading-experience"
 function slugFromPath(pathname: string): string | null {
@@ -33,6 +43,7 @@ export function InlineEditor() {
   const [status, setStatus] = useState<string>('');
   const [publishing, setPublishing] = useState(false);
   const [inlineMode, setInlineMode] = useState(false);
+  const [showDraft, setShowDraft] = useState(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inlineCtl = useRef<InlineEditController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -70,31 +81,49 @@ export function InlineEditor() {
     if (open) void loadContent();
   }, [open, loadContent]);
 
-  // Inline (click-to-edit) mode: enable plain-text editing on the rendered page.
+  // Inline (click-to-edit) mode: edits are keyed by the block's published text
+  // (an EditsMap), so they re-apply to the page when you come back.
   useEffect(() => {
     if (!inlineMode || slug == null) return;
     let active = true;
     (async () => {
       const res = await fetch(`/api/admin/content?slug=${encodeURIComponent(slug)}`);
       const baseline = res.ok ? ((await res.json()).content as string) : '';
-      const draft = await getDraft(slug);
-      const working = draft && draft.content !== baseline ? draft.content : baseline;
+      const map = await getInlineEdits(slug);
+      const existing = await getDraft(slug);
       if (!active) return;
       setPublished(baseline);
-      setContent(working);
-      inlineCtl.current = enablePlainTextEditing(working, (next) => {
-        setContent(next);
-        setHasDraft(next !== baseline);
-        void putDraft(slug, next);
+      // Prefer an existing draft (may include drawer edits) as the merged base.
+      const merged = existing?.content ?? applyEdits(baseline, map);
+      setContent(merged);
+      setHasDraft(merged !== baseline);
+      inlineCtl.current = enablePlainTextEditing(baseline, map, merged, (nextMap, nextMerged) => {
+        setContent(nextMerged);
+        const dirtyNow = nextMerged !== baseline;
+        setHasDraft(dirtyNow);
+        void setInlineEdits(slug, nextMap);
+        if (dirtyNow) void putDraft(slug, nextMerged);
+        else {
+          void deleteInlineEdits(slug);
+          void deleteDraft(slug);
+        }
         setStatus('Draft saved locally.');
       });
+      inlineCtl.current.setShowDraft(showDraft);
     })();
     return () => {
       active = false;
       inlineCtl.current?.destroy();
       inlineCtl.current = null;
     };
+    // showDraft handled via a separate effect so toggling doesn't rebuild.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inlineMode, slug]);
+
+  // Toggle what the page shows: your draft edits, or the published text.
+  useEffect(() => {
+    inlineCtl.current?.setShowDraft(showDraft);
+  }, [showDraft]);
 
   function onEdit(value: string) {
     setContent(value);
@@ -167,7 +196,10 @@ export function InlineEditor() {
       });
       const data = (await res.json().catch(() => ({}))) as { commitUrl?: string; error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Publish failed.');
-      if (slug != null) await deleteDraft(slug);
+      if (slug != null) {
+        await deleteDraft(slug);
+        await deleteInlineEdits(slug);
+      }
       setPublished(content);
       setHasDraft(false);
       setStatus('Published — the live page rebuilds shortly.');
@@ -207,6 +239,13 @@ export function InlineEditor() {
         >
           <strong>Inline editing</strong>
           <span style={{ opacity: 0.9 }}>Click any plain paragraph to edit · formatted blocks use the drawer</span>
+          <button
+            onClick={() => setShowDraft((v) => !v)}
+            title="Toggle between your draft edits and the published text"
+            style={{ border: '1px solid rgba(255,255,255,0.6)', background: showDraft ? 'rgba(255,255,255,0.2)' : 'transparent', color: 'white', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}
+          >
+            {showDraft ? 'Showing: Draft' : 'Showing: Published'}
+          </button>
           <button onClick={publish} disabled={publishing || !dirty} style={{ border: 'none', borderRadius: 6, padding: '5px 12px', fontWeight: 600, cursor: publishing || !dirty ? 'default' : 'pointer', background: 'white', color: orange, opacity: publishing || !dirty ? 0.6 : 1 }}>
             {publishing ? 'Publishing…' : 'Publish'}
           </button>

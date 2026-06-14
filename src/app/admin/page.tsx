@@ -6,7 +6,7 @@ import { LayoutEditor } from './layout-editor';
 
 type Status = { kind: 'idle' | 'ok' | 'err' | 'info'; msg?: string };
 
-const orange = '#e8753b';
+const orange = 'var(--docsdev-accent, #e8753b)';
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);

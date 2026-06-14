@@ -9,9 +9,10 @@
  */
 
 const DB_NAME = 'docsdev-admin';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const DRAFTS = 'drafts';
 const ASSETS = 'assets';
+const INLINE = 'inlineEdits';
 
 export type Draft = { slug: string; content: string; updatedAt: number };
 /** An uploaded image/asset, stored locally until published. `path` is the URL
@@ -26,6 +27,7 @@ function openDB(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains(DRAFTS)) db.createObjectStore(DRAFTS, { keyPath: 'slug' });
       if (!db.objectStoreNames.contains(ASSETS)) db.createObjectStore(ASSETS, { keyPath: 'path' });
+      if (!db.objectStoreNames.contains(INLINE)) db.createObjectStore(INLINE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -61,4 +63,23 @@ export function putAsset(asset: Asset): Promise<unknown> {
 
 export function getAsset(path: string): Promise<Asset | undefined> {
   return tx<Asset | undefined>(ASSETS, 'readonly', (s) => s.get(path) as IDBRequest<Asset | undefined>);
+}
+
+/** Per-page inline edits, keyed by the block's original (published) text. This
+ *  lets inline edits re-apply to the page on a later visit, since the rendered
+ *  DOM always starts from the published baseline. */
+export type EditsMap = Record<string, string>;
+
+export function getInlineEdits(slug: string): Promise<EditsMap> {
+  return tx<EditsMap | undefined>(INLINE, 'readonly', (s) => s.get(slug) as IDBRequest<EditsMap | undefined>).then(
+    (m) => m ?? {},
+  );
+}
+
+export function setInlineEdits(slug: string, map: EditsMap): Promise<unknown> {
+  return tx(INLINE, 'readwrite', (s) => s.put(map, slug));
+}
+
+export function deleteInlineEdits(slug: string): Promise<unknown> {
+  return tx(INLINE, 'readwrite', (s) => s.delete(slug));
 }
