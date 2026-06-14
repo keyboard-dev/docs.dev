@@ -147,6 +147,84 @@ export function InlineEditor() {
     inlineCtl.current?.setShowDraft(showDraft);
   }, [showDraft]);
 
+  // Keep a live ref to the working source for the drop handler's closure.
+  const contentRef = useRef(content);
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
+
+  // Drop-to-Spread: drag an image onto a paragraph and it wraps that paragraph
+  // in a <Spread image=...> so the prose flows around it. Plain, unique
+  // paragraphs only — formatted/duplicate ones fall back to the drawer.
+  useEffect(() => {
+    if (!admin || slug == null) return;
+    const accent = 'var(--docsdev-accent, #e8753b)';
+    const isFileDrag = (e: DragEvent) =>
+      Array.from(e.dataTransfer?.types ?? []).includes('Files');
+    const blockUnder = (t: EventTarget | null): HTMLElement | null =>
+      t instanceof Element ? (t.closest('article p') as HTMLElement | null) : null;
+    let hovered: HTMLElement | null = null;
+    const clear = () => {
+      if (hovered) {
+        hovered.style.outline = '';
+        hovered.style.outlineOffset = '';
+        hovered = null;
+      }
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (!isFileDrag(e) || (e.target as Element)?.closest?.('aside')) return;
+      const blk = blockUnder(e.target);
+      if (!blk) {
+        clear();
+        return;
+      }
+      e.preventDefault();
+      if (hovered !== blk) {
+        clear();
+        hovered = blk;
+        blk.style.outline = `2px dashed ${accent}`;
+        blk.style.outlineOffset = '4px';
+      }
+    };
+    const onDrop = async (e: DragEvent) => {
+      if (!isFileDrag(e) || (e.target as Element)?.closest?.('aside')) return;
+      const blk = blockUnder(e.target);
+      const file = Array.from(e.dataTransfer?.files ?? []).find((f) => f.type.startsWith('image/'));
+      clear();
+      if (!blk || !file) return;
+      e.preventDefault();
+      const text = (blk.textContent ?? '').trim();
+      let working = contentRef.current;
+      if (!working) {
+        const res = await fetch(`/api/admin/content?slug=${encodeURIComponent(slug)}`);
+        working = res.ok ? ((await res.json()).content as string) : '';
+      }
+      const idx = working.indexOf(text);
+      if (text.length < 3 || idx === -1 || working.indexOf(text, idx + 1) !== -1) {
+        setStatus("Can't wrap that block here (formatted or duplicated) — use the drawer.");
+        return;
+      }
+      const dataUrl = await readDataUrl(file);
+      const path = `/uploads/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+      await putAsset({ path, contentType: file.type, dataUrl });
+      const block = `<Spread image="${path}" alt="${file.name}" side="right" width={240} height={240}>\n\n${text}\n\n</Spread>`;
+      const next = working.slice(0, idx) + block + working.slice(idx + text.length);
+      saveContent(next);
+      setPageShowsDraft(true);
+      setStatus('Image dropped — this paragraph now flows around it.');
+    };
+    document.addEventListener('dragover', onDragOver);
+    document.addEventListener('drop', onDrop);
+    document.addEventListener('dragleave', clear);
+    return () => {
+      document.removeEventListener('dragover', onDragOver);
+      document.removeEventListener('drop', onDrop);
+      document.removeEventListener('dragleave', clear);
+      clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [admin, slug]);
+
   function onEdit(value: string) {
     setContent(value);
     if (slug == null) return;
