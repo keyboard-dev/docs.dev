@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { deleteDraft, getDraft, putDraft } from '@/lib/drafts';
+import { enablePlainTextEditing, type InlineEditController } from './inline-edit-dom';
 
 const orange = '#e8753b';
 
@@ -31,7 +32,9 @@ export function InlineEditor() {
   const [hasDraft, setHasDraft] = useState(false);
   const [status, setStatus] = useState<string>('');
   const [publishing, setPublishing] = useState(false);
+  const [inlineMode, setInlineMode] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inlineCtl = useRef<InlineEditController | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +67,32 @@ export function InlineEditor() {
   useEffect(() => {
     if (open) void loadContent();
   }, [open, loadContent]);
+
+  // Inline (click-to-edit) mode: enable plain-text editing on the rendered page.
+  useEffect(() => {
+    if (!inlineMode || slug == null) return;
+    let active = true;
+    (async () => {
+      const res = await fetch(`/api/admin/content?slug=${encodeURIComponent(slug)}`);
+      const baseline = res.ok ? ((await res.json()).content as string) : '';
+      const draft = await getDraft(slug);
+      const working = draft && draft.content !== baseline ? draft.content : baseline;
+      if (!active) return;
+      setPublished(baseline);
+      setContent(working);
+      inlineCtl.current = enablePlainTextEditing(working, (next) => {
+        setContent(next);
+        setHasDraft(next !== baseline);
+        void putDraft(slug, next);
+        setStatus('Draft saved locally.');
+      });
+    })();
+    return () => {
+      active = false;
+      inlineCtl.current?.destroy();
+      inlineCtl.current = null;
+    };
+  }, [inlineMode, slug]);
 
   function onEdit(value: string) {
     setContent(value);
@@ -109,27 +138,75 @@ export function InlineEditor() {
 
   return (
     <>
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
+      {/* Inline (click-to-edit) mode bar */}
+      {inlineMode && (
+        <div
           style={{
             position: 'fixed',
-            right: 20,
-            bottom: 20,
+            top: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
             zIndex: 60,
-            padding: '12px 18px',
-            borderRadius: 999,
-            border: 'none',
+            display: 'flex',
+            gap: 14,
+            alignItems: 'center',
+            padding: '8px 16px',
+            margin: 8,
+            borderRadius: 10,
             background: orange,
             color: 'white',
-            fontWeight: 600,
-            fontSize: 14,
+            fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+            fontSize: 13,
             boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
-            cursor: 'pointer',
           }}
         >
-          ✏️ Edit{hasDraft ? ' ●' : ''}
-        </button>
+          <strong>Inline editing</strong>
+          <span style={{ opacity: 0.9 }}>Click any plain paragraph to edit · formatted blocks use the drawer</span>
+          <button onClick={publish} disabled={publishing || !dirty} style={{ border: 'none', borderRadius: 6, padding: '5px 12px', fontWeight: 600, cursor: publishing || !dirty ? 'default' : 'pointer', background: 'white', color: orange, opacity: publishing || !dirty ? 0.6 : 1 }}>
+            {publishing ? 'Publishing…' : 'Publish'}
+          </button>
+          <button onClick={() => setInlineMode(false)} style={{ border: '1px solid rgba(255,255,255,0.6)', background: 'transparent', color: 'white', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>
+            Done
+          </button>
+          {status && <span style={{ opacity: 0.85 }}>{status}</span>}
+        </div>
+      )}
+
+      {!open && !inlineMode && (
+        <div style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 60, display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => setInlineMode(true)}
+            style={{
+              padding: '12px 16px',
+              borderRadius: 999,
+              border: `1px solid ${orange}`,
+              background: 'white',
+              color: orange,
+              fontWeight: 600,
+              fontSize: 14,
+              boxShadow: '0 6px 20px rgba(0,0,0,0.18)',
+              cursor: 'pointer',
+            }}
+          >
+            ✎ Inline edit{hasDraft ? ' ●' : ''}
+          </button>
+          <button
+            onClick={() => setOpen(true)}
+            style={{
+              padding: '12px 18px',
+              borderRadius: 999,
+              border: 'none',
+              background: orange,
+              color: 'white',
+              fontWeight: 600,
+              fontSize: 14,
+              boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
+              cursor: 'pointer',
+            }}
+          >
+            ✏️ Drawer
+          </button>
+        </div>
       )}
 
       {open && (
