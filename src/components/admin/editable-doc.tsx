@@ -139,6 +139,55 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     const widthPct = a.width ?? 42;
     const selected = selFig === b.id;
     const setAttr = (patch: Partial<SpreadAttrs>) => update(b.id, { attrs: serializeAttrs({ ...a, ...patch }) });
+    const setAttrLocal = (patch: Partial<SpreadAttrs>) =>
+      setBlocks((prev) => prev.map((x) => (x.id === b.id ? { ...x, attrs: serializeAttrs({ ...a, ...patch }) } : x)));
+
+    // Drag the figure to switch side; drag the corner to resize (width %).
+    function startDrag(e: React.PointerEvent) {
+      if ((e.target as HTMLElement).dataset?.resize) return startResize(e);
+      e.preventDefault();
+      e.stopPropagation();
+      setSelFig(b.id);
+      let curSide = side;
+      const move = (ev: PointerEvent) => {
+        const article = (document.querySelector('article') ?? document.body) as HTMLElement;
+        const rect = article.getBoundingClientRect();
+        const mid = rect.left + rect.width / 2;
+        const next = ev.clientX < mid - 40 ? 'left' : ev.clientX > mid + 40 ? 'right' : curSide;
+        if (next !== curSide) {
+          curSide = next;
+          setAttrLocal({ side: next });
+        }
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        setAttr({ side: curSide });
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    }
+    function startResize(e: React.PointerEvent | PointerEvent) {
+      e.preventDefault();
+      (e as Event).stopPropagation();
+      setSelFig(b.id);
+      const article = (document.querySelector('article') ?? document.body) as HTMLElement;
+      const colW = article.getBoundingClientRect().width || 720;
+      const startX = (e as PointerEvent).clientX;
+      let w = widthPct;
+      const move = (ev: PointerEvent) => {
+        const dxPct = ((ev.clientX - startX) / colW) * 100;
+        w = Math.max(26, Math.min(70, side === 'left' ? widthPct + dxPct : widthPct - dxPct));
+        setAttrLocal({ width: Math.round(w) });
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        setAttr({ width: Math.round(w) });
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    }
     const visual = a.orb ? (
       <div style={{ width: '100%', aspectRatio: '4 / 3', borderRadius: 12, background: 'radial-gradient(125% 125% at 30% 24%, #f6b079 0%, #e07a2c 38%, #c2571f 64%, #8f3d12 100%)', boxShadow: '0 12px 34px rgba(170,75,22,0.3)' }} />
     ) : a.image ? (
@@ -150,9 +199,17 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       <div style={{ display: 'flow-root', margin: '0 0 22px' }}>
         <div
           onClick={(e) => { e.stopPropagation(); setSelFig(b.id); }}
-          style={{ position: 'relative', cursor: 'pointer', ...figureStyle(side, widthPct), ...(selected ? { outline: `2px solid ${ACCENT}`, outlineOffset: 3, borderRadius: 14 } : null) }}
+          onPointerDown={startDrag}
+          style={{ position: 'relative', cursor: 'grab', touchAction: 'none', ...figureStyle(side, widthPct), ...(selected ? { outline: `2px solid ${ACCENT}`, outlineOffset: 3, borderRadius: 14 } : null) }}
         >
           {visual}
+          {selected && (side === 'left' || side === 'right' || side === 'inline') && (
+            <div
+              data-resize="1"
+              onPointerDown={startResize}
+              style={{ position: 'absolute', bottom: -8, ...(side === 'left' ? { right: -8 } : { left: -8 }), width: 16, height: 16, background: '#fff', border: `2px solid ${ACCENT}`, borderRadius: 4, cursor: 'nwse-resize', zIndex: 9 }}
+            />
+          )}
           {selected && (
             <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: -44, left: 0, display: 'flex', gap: 8, background: '#fff', border: '1px solid #EAE4DA', borderRadius: 10, boxShadow: '0 8px 24px rgba(28,26,22,0.16)', padding: '5px 7px', whiteSpace: 'nowrap', zIndex: 8 }}>
               <div style={{ display: 'flex', gap: 1, background: '#F2EEE6', borderRadius: 7, padding: 2 }}>
