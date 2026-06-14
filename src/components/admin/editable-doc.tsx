@@ -41,8 +41,20 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
   const [frontmatter, setFrontmatter] = useState(initial.frontmatter);
   const [blocks, setBlocks] = useState<Block[]>(initial.blocks);
   const [selFig, setSelFig] = useState<string | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
   const fileFor = useRef<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  const PALETTE: Array<[string, string]> = [
+    ['prose', 'Paragraph'],
+    ['heading', 'Heading'],
+    ['callout', 'Callout'],
+    ['code', 'Code block'],
+    ['cards', 'Cards'],
+    ['spread', 'Spread (image)'],
+  ];
+
+  const [insertAt, setInsertAt] = useState<number | null>(null);
 
   const emit = (b: Block[] = blocks, fm: string = frontmatter) => onChange(serializeDoc({ frontmatter: fm, blocks: b }));
   const update = (id: string, patch: Partial<Block>) => {
@@ -50,6 +62,38 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     setBlocks(next);
     emit(next);
   };
+  const commitBlocks = (next: Block[]) => {
+    setBlocks(next);
+    emit(next);
+  };
+  const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  function newBlock(type: string): Block {
+    const id = newId();
+    switch (type) {
+      case 'heading': return { id, type: 'heading', depth: 2, text: 'New section' };
+      case 'callout': return { id, type: 'callout', props: 'type="info"', text: 'Note worth pulling out of the flow.' };
+      case 'code': return { id, type: 'code', lang: 'ts', meta: '', code: 'const x = 1;' };
+      case 'cards': return { id, type: 'cards', raw: '<Cards>\n  <Card title="Title" href="/" />\n</Cards>' };
+      case 'spread': return { id, type: 'spread', attrs: 'orb side="right" width="42%"', inner: 'Describe this image — the prose here flows around the figure beside it.' };
+      default: return { id, type: 'prose', text: 'New paragraph. Click to edit.' };
+    }
+  }
+  function insertBlock(type: string, index: number) {
+    const next = blocks.slice();
+    next.splice(index, 0, newBlock(type));
+    setInsertAt(null);
+    commitBlocks(next);
+  }
+  function deleteBlock(id: string) {
+    commitBlocks(blocks.filter((b) => b.id !== id));
+  }
+  function moveBlock(index: number, dir: -1 | 1) {
+    const j = index + dir;
+    if (j < 0 || j >= blocks.length) return;
+    const next = blocks.slice();
+    [next[index], next[j]] = [next[j]!, next[index]!];
+    commitBlocks(next);
+  }
   const setMeta = (key: string, val: string) => {
     const fm = setMetaLine(frontmatter, key, val);
     setFrontmatter(fm);
@@ -188,7 +232,53 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
         {metaLine(frontmatter, 'description')}
       </div>
       <div style={{ height: 1, background: '#EAE4DA', margin: '18px 0 26px' }} />
-      {blocks.map(renderBlock)}
+
+      {insertRow(0)}
+      {blocks.map((b, i) => (
+        <div key={b.id}>
+          <div
+            onMouseEnter={() => setHoverId(b.id)}
+            onMouseLeave={() => setHoverId((h) => (h === b.id ? null : h))}
+            style={{ position: 'relative' }}
+          >
+            {hoverId === b.id && (
+              <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', right: -10, top: 0, display: 'flex', gap: 3, zIndex: 9 }}>
+                {[['↑', () => moveBlock(i, -1)], ['↓', () => moveBlock(i, 1)], ['✕', () => deleteBlock(b.id)]].map(([label, fn], k) => (
+                  <button key={k} onClick={fn as () => void} style={{ width: 22, height: 22, border: '1px solid #E2DCD0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12, color: label === '✕' ? '#c0392b' : '#57534a' }}>
+                    {label as string}
+                  </button>
+                ))}
+              </div>
+            )}
+            {renderBlock(b)}
+          </div>
+          {insertRow(i + 1)}
+        </div>
+      ))}
     </div>
   );
+
+  function insertRow(index: number) {
+    const open = insertAt === index;
+    return (
+      <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', zIndex: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', height: open ? 'auto' : 24, minHeight: 24, margin: open ? '6px 0' : 0 }}>
+        <button
+          onClick={() => setInsertAt(open ? null : index)}
+          title="Insert a block"
+          style={{ position: 'relative', zIndex: 7, width: 22, height: 22, borderRadius: 7, border: '1px solid #E2DCD0', background: '#fff', color: ACCENT, cursor: 'pointer', fontSize: 15, lineHeight: 1, transform: open ? 'rotate(45deg)' : 'none', boxShadow: '0 1px 2px rgba(28,26,22,0.06)' }}
+        >
+          +
+        </button>
+        {open && (
+          <div style={{ position: 'absolute', top: 32, zIndex: 20, background: '#fff', border: '1px solid #EAE4DA', borderRadius: 12, boxShadow: '0 16px 40px rgba(28,26,22,0.18)', padding: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, width: 280 }}>
+            {PALETTE.map(([type, label]) => (
+              <button key={type} onClick={() => insertBlock(type, index)} style={{ padding: '9px 10px', border: 'none', background: 'transparent', borderRadius: 8, cursor: 'pointer', textAlign: 'left', fontSize: 13.5, fontWeight: 500, color: '#2a2722' }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 }
