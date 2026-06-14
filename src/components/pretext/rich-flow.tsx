@@ -40,17 +40,25 @@ import type { Run } from './extract-runs';
 
 export type FlowObstacle = {
   id: string;
-  side: 'left' | 'right';
+  /** Relative placement (design's model). `inline` centers the figure and lets
+   *  pretext flow text on BOTH sides; `full` spans the column (text stacks). */
+  side: 'left' | 'right' | 'inline' | 'full';
   shape?: 'rect' | 'circle';
-  width: number;
-  height: number;
-  top: number;
-  /** Absolute left offset within the column. Overrides `side` when set —
-   *  this is what the visual layout editor sets when you drag the figure. */
-  x?: number;
+  /** Figure width as a percentage of the column — keeps the editor and the
+   *  published page identical at any width, and reflows responsively. */
+  widthPct: number;
+  /** Box aspect ratio (width / height). Default 4/3 for images, 1 for circles. */
+  aspect?: number;
+  /** Vertical offset from the top of the flow, in px. */
+  anchorTop?: number;
   gap?: number;
   node: ReactNode;
 };
+
+// Below this column width the figure goes full-width and prose stacks.
+const NARROW_WIDTH = 560;
+
+type PlacedObstacle = { id: string; node: ReactNode; x: number; top: number; w: number; h: number };
 
 export type RichFlowProps = {
   runs: Run[];
@@ -91,6 +99,7 @@ export function RichFlow({
 }: RichFlowProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [placed, setPlaced] = useState<Placed[]>([]);
+  const [placedObstacles, setPlacedObstacles] = useState<PlacedObstacle[]>([]);
   const [height, setHeight] = useState(0);
   const [ready, setReady] = useState(false);
   const [fontsReady, setFontsReady] = useState(false);
@@ -142,27 +151,29 @@ export function RichFlow({
       }));
       const prepared = prepareRichInline(items);
 
-      // Translate obstacles into geometry the carver understands.
+      // Translate the relative obstacle model into px geometry for the carver,
+      // recomputed against the *current* width so it's WYSIWYG and responsive.
+      const narrow = containerWidth <= NARROW_WIDTH;
       const rects: RectObstacle[] = [];
       const circles: CircleObstacle[] = [];
+      const placedObs: PlacedObstacle[] = [];
       for (const o of obstacles) {
         const gap = o.gap ?? 24;
-        const x = o.x ?? (o.side === 'left' ? 0 : containerWidth - o.width);
-        if (o.shape === 'circle') {
-          circles.push({
-            cx: x + o.width / 2,
-            cy: o.top + o.height / 2,
-            r: o.width / 2,
-            hPad: gap,
-            vPad: gap / 2,
-          });
+        const full = narrow || o.side === 'full';
+        const w = full ? containerWidth : Math.round((o.widthPct / 100) * containerWidth);
+        const aspect = o.aspect ?? (o.shape === 'circle' ? 1 : 4 / 3);
+        const h = Math.round(w / aspect);
+        const top = full ? (o.anchorTop != null && !narrow ? o.anchorTop : 0) : o.anchorTop ?? 6;
+        const x = full ? 0 : o.side === 'left' ? 0 : o.side === 'inline' ? Math.round((containerWidth - w) / 2) : containerWidth - w;
+        placedObs.push({ id: o.id, node: o.node, x, top, w, h });
+
+        if (full) {
+          // Spans the whole column → no slot in this band → text stacks below.
+          rects.push({ x: 0, y: top, w: containerWidth, h });
+        } else if (o.shape === 'circle') {
+          circles.push({ cx: x + w / 2, cy: top + h / 2, r: w / 2, hPad: gap, vPad: gap / 2 });
         } else {
-          rects.push({
-            x: o.side === 'left' ? x : x - gap,
-            y: o.top,
-            w: o.width + gap,
-            h: o.height,
-          });
+          rects.push({ x: x === 0 ? 0 : x - gap, y: top, w: w + gap, h });
         }
       }
 
@@ -213,9 +224,10 @@ export function RichFlow({
       }
 
       let bottom = y;
-      for (const o of obstacles) bottom = Math.max(bottom, o.top + o.height);
+      for (const o of placedObs) bottom = Math.max(bottom, o.top + o.h);
 
       setPlaced(next);
+      setPlacedObstacles(placedObs);
       setHeight(bottom);
       setReady(true);
     };
@@ -242,7 +254,7 @@ export function RichFlow({
         }
       : null),
     ...(kind === 'link'
-      ? { color: 'var(--pretext-link, #e8753b)', textDecoration: 'underline' }
+      ? { color: 'var(--docsdev-accent, #c2571f)', textDecoration: 'underline' }
       : null),
   });
 
@@ -257,16 +269,10 @@ export function RichFlow({
       </div>
 
       {ready &&
-        obstacles.map((o) => (
+        placedObstacles.map((o) => (
           <div
             key={o.id}
-            style={{
-              position: 'absolute',
-              top: o.top,
-              ...(o.x != null ? { left: o.x } : { [o.side]: 0 }),
-              width: o.width,
-              height: o.height,
-            }}
+            style={{ position: 'absolute', left: o.x, top: o.top, width: o.w, height: o.h }}
           >
             {o.node}
           </div>

@@ -42,7 +42,7 @@ const ADD_ITEMS: AddItem[] = [
   { label: 'Install tabs', snippet: '\n\n```package-install\nreact\n```\n\n' },
   { label: 'Divider', snippet: '\n\n---\n\n' },
   { label: 'Image…', upload: 'image' },
-  { label: 'Spread (orb)', snippet: '\n\n<Spread orb side="right" width={220} height={220}>\n\nYour prose flows around the orb.\n\n</Spread>\n\n' },
+  { label: 'Spread (orb)', snippet: '\n\n<Spread orb side="right" width="42%">\n\nYour prose flows around the orb.\n\n</Spread>\n\n' },
   { label: 'Spread w/ image…', upload: 'spread' },
 ];
 
@@ -228,7 +228,7 @@ export function InlineEditor() {
       const dataUrl = await readDataUrl(file);
       const path = `/uploads/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
       await putAsset({ path, contentType: file.type, dataUrl });
-      const block = `<Spread image="${path}" alt="${file.name}" side="right" width={240} height={240}>\n\n${text}\n\n</Spread>`;
+      const block = `<Spread image="${path}" alt="${file.name}" side="right" width="42%">\n\n${text}\n\n</Spread>`;
       const next = working.slice(0, idx) + block + working.slice(idx + text.length);
       saveContent(next);
       setPageShowsDraft(true);
@@ -297,7 +297,7 @@ export function InlineEditor() {
       const path = `/uploads/${Date.now()}-${safe}`;
       await putAsset({ path, contentType: file.type, dataUrl });
       const snippet = asSpread
-        ? `\n\n<Spread image="${path}" alt="${file.name}" side="right" width={240} height={240}>\n\nDescribe this image — the prose here flows around it.\n\n</Spread>\n\n`
+        ? `\n\n<Spread image="${path}" alt="${file.name}" side="right" width="42%">\n\nDescribe this image — the prose here flows around it.\n\n</Spread>\n\n`
         : `\n\n![${file.name}](${path})\n\n`;
       working = working.slice(0, insertAt) + snippet + working.slice(insertAt);
       insertAt += snippet.length;

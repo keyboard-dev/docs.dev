@@ -9,11 +9,11 @@
  */
 
 export type SpreadAttrs = {
-  side?: 'left' | 'right';
-  x?: number;
-  top?: number;
+  side?: 'left' | 'right' | 'inline' | 'full';
+  /** Width as a percentage of the column (relative model). */
   width?: number;
-  height?: number;
+  /** Vertical anchor, px from the top of the block. */
+  top?: number;
   gap?: number;
   orb?: boolean;
   image?: string;
@@ -50,13 +50,19 @@ export function parseAttrs(raw: string): SpreadAttrs {
   for (const m of raw.matchAll(/(\w+)=\{\s*(-?\d+(?:\.\d+)?)\s*\}/g)) {
     (attrs as Record<string, number>)[m[1]!] = Number(m[2]);
   }
-  // key="string"
+  // key="string"  (width="42%" is captured here, then normalized to a number)
   for (const m of raw.matchAll(/(\w+)="([^"]*)"/g)) {
     (attrs as Record<string, string>)[m[1]!] = m[2]!;
   }
   // boolean key (e.g. `orb`) — present without a value
   for (const m of raw.matchAll(/(?:^|\s)(\w+)(?=\s|$)(?![=])/g)) {
     if (!(m[1]! in attrs)) (attrs as Record<string, boolean>)[m[1]!] = true;
+  }
+  // Normalize width: accept "42%" or 42 → a number percentage.
+  if (typeof attrs.width === 'string') {
+    const n = parseFloat(attrs.width as unknown as string);
+    if (!Number.isNaN(n)) attrs.width = n;
+    else delete attrs.width;
   }
   return attrs;
 }
@@ -67,7 +73,8 @@ export function serializeAttrs(attrs: SpreadAttrs): string {
   if (attrs.image) parts.push(`image="${attrs.image}"`);
   if (attrs.alt) parts.push(`alt="${attrs.alt}"`);
   if (attrs.side) parts.push(`side="${attrs.side}"`);
-  for (const key of ['x', 'top', 'width', 'height', 'gap'] as const) {
+  if (attrs.width != null) parts.push(`width="${Math.round(attrs.width)}%"`);
+  for (const key of ['top', 'gap'] as const) {
     const v = attrs[key];
     if (v != null) parts.push(`${key}={${Math.round(v)}}`);
   }

@@ -5,7 +5,7 @@
 :root {
   /* Brand accent used by the editor UI (bars, buttons, links, the orb).
      Override this one variable to rebrand docs.dev for your site. */
-  --docsdev-accent: #e8753b;
+  --docsdev-accent: #c2571f;
 }
 
 html {

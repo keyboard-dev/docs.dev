@@ -5,35 +5,24 @@ import { RichFlow, type FlowObstacle } from '@/components/pretext/rich-flow';
 import type { Run } from '@/components/pretext/extract-runs';
 import { DraftImage } from '@/components/draft-image';
 import { putAsset } from '@/lib/drafts';
-import {
-  findSpread,
-  writeSpreadAttrs,
-  type SpreadAttrs,
-} from '@/components/pretext/spread-tag';
+import { findSpread, writeSpreadAttrs, type SpreadAttrs } from '@/components/pretext/spread-tag';
 
 /**
- * Drag-to-arrange layout editor — the docs.dev answer to the pretext
- * playground. Renders the page's <Spread> block live; drag the figure to move
- * it, drag its corner to resize, and the prose reflows instantly. On drop, the
- * new geometry is written back into the <Spread> tag in the MDX source.
+ * Drag-to-arrange layout editor for a <Spread>. Pretext does the actual text
+ * flow; this just edits the *relative* position model the design specified —
+ * a side (Left / Right / Inline / Full), a width as a % of the column, and a
+ * vertical anchor — so what you arrange matches the published page at any width.
  */
 
-type Drag =
-  | { mode: 'move'; px: number; py: number; x: number; top: number }
-  | { mode: 'resize'; px: number; py: number; w: number; h: number }
-  | null;
+const ACCENT = 'var(--docsdev-accent, #c2571f)';
+const SIDES: Array<SpreadAttrs['side']> = ['left', 'right', 'full', 'inline'];
+
+type Geo = { side: NonNullable<SpreadAttrs['side']>; widthPct: number; top: number };
+type Drag = { mode: 'move' | 'resize'; px: number; py: number; geo: Geo } | null;
 
 function Orb() {
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        borderRadius: '50%',
-        background: 'radial-gradient(circle at 35% 30%, #ffb27a 0%, #e8753b 35%, #7a2d12 100%)',
-        boxShadow: '0 0 60px 12px rgba(232,117,59,0.40), inset -16px -20px 50px rgba(0,0,0,0.45)',
-      }}
-    />
+    <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'radial-gradient(125% 125% at 30% 24%, #f6b079 0%, #e07a2c 38%, #c2571f 64%, #8f3d12 100%)', boxShadow: '0 12px 34px rgba(170,75,22,0.30)' }} />
   );
 }
 
@@ -48,37 +37,29 @@ function toPlainRuns(markdown: string): Run[] {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-export function LayoutEditor({
-  content,
-  onApply,
-}: {
-  content: string;
-  onApply: (next: string) => void;
-}) {
+// Mirror RichFlow's geometry so the overlay sits exactly over the figure.
+function figGeo(W: number, side: Geo['side'], widthPct: number, top: number, aspect: number) {
+  const narrow = W <= 560;
+  const full = narrow || side === 'full';
+  const w = full ? W : Math.round((widthPct / 100) * W);
+  const h = Math.round(w / aspect);
+  const x = full ? 0 : side === 'left' ? 0 : side === 'inline' ? Math.round((W - w) / 2) : W - w;
+  const y = narrow ? 0 : top;
+  return { x, y, w, h, full };
+}
+
+export function LayoutEditor({ content, onApply }: { content: string; onApply: (next: string) => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(680);
   const match = useMemo(() => findSpread(content), [content]);
-
-  // Geometry the editor manipulates. Seeded from the tag; x defaults from side.
-  const [geo, setGeo] = useState<Required<Pick<SpreadAttrs, 'x' | 'top' | 'width' | 'height'>>>({
-    x: 0,
-    top: 6,
-    width: 220,
-    height: 220,
-  });
+  const [geo, setGeo] = useState<Geo>({ side: 'right', widthPct: 42, top: 6 });
+  const geoRef = useRef(geo);
+  const setGeoSynced = (next: Geo) => {
+    geoRef.current = next;
+    setGeo(next);
+  };
   const dragRef = useRef<Drag>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Mirror of `geo` that's always current, so drag-end (a stale closure over
-  // state) commits the dragged geometry rather than the value at drag-start.
-  const geoRef = useRef(geo);
-  const setGeoSynced = (updater: (g: typeof geo) => typeof geo) => {
-    setGeo((g) => {
-      const next = updater(g);
-      geoRef.current = next;
-      return next;
-    });
-  };
-  // Stop re-seeding from the tag once the user starts arranging.
   const userTouched = useRef(false);
 
   useEffect(() => {
@@ -91,52 +72,49 @@ export function LayoutEditor({
     return () => ro.disconnect();
   }, []);
 
-  // Seed geometry from the parsed tag. Re-runs as the measured width settles,
-  // until the user drags — so `x` derived from `side="right"` is correct.
+  // Seed from the tag (until the user starts arranging).
   useEffect(() => {
     if (userTouched.current || !match) return;
     const a = match.attrs;
-    const w = a.width ?? 220;
-    const h = a.height ?? 220;
-    const x = a.x ?? (a.side === 'left' ? 0 : Math.max(0, width - w));
-    const next = { x, top: a.top ?? 6, width: w, height: h };
+    const next: Geo = { side: a.side ?? 'right', widthPct: a.width ?? 42, top: a.top ?? 6 };
     geoRef.current = next;
     setGeo(next);
-  }, [match, width]);
+  }, [match]);
 
   if (!match) {
     return (
       <p style={{ color: '#888', fontSize: 14 }}>
-        No <code>&lt;Spread&gt;</code> block on this page yet. Add one in the editor to arrange it
-        visually.
+        No <code>&lt;Spread&gt;</code> block on this page yet. Add one to arrange it visually.
       </p>
     );
   }
 
   const sm = match;
   const isCircle = sm.attrs.orb === true;
+  const aspect = isCircle ? 1 : 4 / 3;
   const runs = toPlainRuns(sm.inner);
+  const node = isCircle ? (
+    <Orb />
+  ) : sm.attrs.image ? (
+    <DraftImage src={sm.attrs.image} alt={sm.attrs.alt ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }} />
+  ) : (
+    <div style={{ width: '100%', height: '100%', borderRadius: 12, background: '#0d1117' }} />
+  );
+
   const figure: FlowObstacle = {
     id: 'editor-figure',
-    side: 'right',
+    side: geo.side,
     shape: isCircle ? 'circle' : 'rect',
-    x: geo.x,
-    top: geo.top,
-    width: geo.width,
-    height: geo.height,
+    widthPct: geo.widthPct,
+    aspect,
+    anchorTop: geo.top,
     gap: sm.attrs.gap ?? 28,
-    node: isCircle ? (
-      <Orb />
-    ) : sm.attrs.image ? (
-      <DraftImage
-        src={sm.attrs.image}
-        alt={sm.attrs.alt ?? ''}
-        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }}
-      />
-    ) : (
-      <div style={{ width: '100%', height: '100%', borderRadius: 12, background: '#0d1117' }} />
-    ),
+    node,
   };
+
+  function commit(next: Geo, extra?: Partial<SpreadAttrs>) {
+    onApply(writeSpreadAttrs(content, { ...sm.attrs, side: next.side, width: next.widthPct, top: next.top, ...extra }));
+  }
 
   function readDataUrl(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -146,73 +124,43 @@ export function LayoutEditor({
       r.readAsDataURL(file);
     });
   }
-
-  // Upload an image and make it the Spread's figure (replacing the orb), keeping
-  // the current position/size so it's immediately draggable.
   async function handleUpload(file: File) {
     if (!file.type.startsWith('image/')) return;
     const dataUrl = await readDataUrl(file);
-    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
-    const path = `/uploads/${Date.now()}-${safe}`;
+    const path = `/uploads/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
     await putAsset({ path, contentType: file.type, dataUrl });
     userTouched.current = true;
-    const g = geoRef.current;
-    onApply(
-      writeSpreadAttrs(content, {
-        ...sm.attrs,
-        orb: undefined,
-        image: path,
-        alt: file.name,
-        side: g.x + g.width / 2 < width / 2 ? 'left' : 'right',
-        x: g.x,
-        top: g.top,
-        width: g.width,
-        height: g.height,
-      }),
-    );
+    commit(geoRef.current, { orb: undefined, image: path, alt: file.name });
   }
 
   function onPointerMove(e: PointerEvent) {
     const d = dragRef.current;
     if (!d) return;
-    setGeoSynced((g) => {
-      if (d.mode === 'move') {
-        return {
-          ...g,
-          x: clamp(d.x + (e.clientX - d.px), 0, Math.max(0, width - g.width)),
-          top: Math.max(0, d.top + (e.clientY - d.py)),
-        };
-      }
-      const w = clamp(d.w + (e.clientX - d.px), 80, width);
-      const h = clamp(d.h + (e.clientY - d.py), 80, 800);
-      return { ...g, width: w, height: h, x: Math.min(g.x, Math.max(0, width - w)) };
-    });
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    if (d.mode === 'move') {
+      const mid = rect.left + rect.width / 2;
+      const side: Geo['side'] = e.clientX < mid - 60 ? 'left' : e.clientX > mid + 60 ? 'right' : d.geo.side;
+      const top = clamp(d.geo.top + (e.clientY - d.py), 0, 440);
+      setGeoSynced({ ...d.geo, side, top: Math.round(top) });
+    } else {
+      const colW = width;
+      const dxPct = ((e.clientX - d.px) / colW) * 100;
+      const w = clamp(d.geo.side === 'left' ? d.geo.widthPct + dxPct : d.geo.widthPct - dxPct, 26, 70);
+      setGeoSynced({ ...d.geo, widthPct: Math.round(w) });
+    }
   }
-
   function endDrag() {
     if (!dragRef.current) return;
     dragRef.current = null;
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', endDrag);
-    // Commit the *current* geometry (via the ref) back into the MDX source.
-    const g = geoRef.current;
-    const side = g.x + g.width / 2 < width / 2 ? 'left' : 'right';
-    onApply(
-      writeSpreadAttrs(content, {
-        ...sm.attrs,
-        side,
-        x: g.x,
-        top: g.top,
-        width: g.width,
-        height: g.height,
-      }),
-    );
+    commit(geoRef.current);
   }
-
   function startMove(e: React.PointerEvent) {
     e.preventDefault();
     userTouched.current = true;
-    dragRef.current = { mode: 'move', px: e.clientX, py: e.clientY, x: geo.x, top: geo.top };
+    dragRef.current = { mode: 'move', px: e.clientX, py: e.clientY, geo: geoRef.current };
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', endDrag);
   }
@@ -220,76 +168,89 @@ export function LayoutEditor({
     e.preventDefault();
     e.stopPropagation();
     userTouched.current = true;
-    dragRef.current = { mode: 'resize', px: e.clientX, py: e.clientY, w: geo.width, h: geo.height };
+    dragRef.current = { mode: 'resize', px: e.clientX, py: e.clientY, geo: geoRef.current };
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', endDrag);
   }
 
+  function setSide(side: Geo['side']) {
+    userTouched.current = true;
+    const next = { ...geoRef.current, side };
+    setGeoSynced(next);
+    commit(next);
+  }
+  function stepWidth(delta: number) {
+    userTouched.current = true;
+    const next = { ...geoRef.current, widthPct: clamp(geoRef.current.widthPct + delta, 26, 70) };
+    setGeoSynced(next);
+    commit(next);
+  }
+
+  const fg = figGeo(width, geo.side, geo.widthPct, geo.top, aspect);
+  const showHandle = !fg.full;
+  const isFloat = geo.side === 'left' || geo.side === 'right' || geo.side === 'inline';
+
+  const segBtn = (label: string, val: Geo['side']): React.CSSProperties => ({
+    height: 24, padding: '0 8px', border: 'none', borderRadius: 6, cursor: 'pointer',
+    fontSize: 12, fontWeight: geo.side === val ? 600 : 500,
+    background: geo.side === val ? '#1c1a16' : 'transparent', color: geo.side === val ? '#fff' : '#7a766c',
+  });
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-        <p style={{ fontSize: 13, color: '#888', margin: 0, flex: 1 }}>
-          Drag the figure to move it · drag the corner to resize · text reflows live. Release to
-          write the position back into the source.
-        </p>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #ccc', background: 'transparent', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          📎 {sm.attrs.image ? 'Replace image' : 'Upload image'}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void handleUpload(f);
-            e.target.value = '';
-          }}
-        />
-      </div>
-      <div
-        ref={wrapRef}
-        style={{
-          position: 'relative',
-          border: '1px dashed #ccc',
-          borderRadius: 12,
-          padding: 20,
-          background: 'var(--pretext-preview-bg, #fafafa)',
+      <p style={{ fontSize: 13, color: '#888', margin: '0 0 10px' }}>
+        Click the figure for presets · drag to move · drag the corner to resize. Position is stored
+        as side + width %, so it matches the published page and reflows on mobile.
+      </p>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void handleUpload(f);
+          e.target.value = '';
         }}
-      >
+      />
+      <div ref={wrapRef} style={{ position: 'relative', border: '1px dashed #ccc', borderRadius: 12, padding: 0, overflow: 'hidden' }}>
         <RichFlow runs={runs} obstacles={[figure]} fallback={null} />
 
-        {/* Interactive overlay sitting exactly over the engine-positioned figure. */}
+        {/* Selection ring + handle over the figure */}
         <div
           onPointerDown={startMove}
-          style={{
-            position: 'absolute',
-            left: 20 + geo.x,
-            top: 20 + geo.top,
-            width: geo.width,
-            height: geo.height,
-            cursor: 'grab',
-            borderRadius: isCircle ? '50%' : 12,
-            outline: '2px solid rgba(232,117,59,0.7)',
-            outlineOffset: 2,
-          }}
+          style={{ position: 'absolute', left: fg.x, top: fg.y, width: fg.w, height: fg.h, cursor: 'grab', borderRadius: isCircle ? '50%' : 12, outline: `2px solid ${ACCENT}`, outlineOffset: 2 }}
         >
-          <div
-            onPointerDown={startResize}
-            style={{
-              position: 'absolute',
-              right: -7,
-              bottom: -7,
-              width: 14,
-              height: 14,
-              borderRadius: 3,
-              background: '#e8753b',
-              cursor: 'nwse-resize',
-            }}
-          />
+          {showHandle && (
+            <div
+              onPointerDown={startResize}
+              style={{ position: 'absolute', bottom: -7, ...(geo.side === 'left' ? { right: -7 } : { left: -7 }), width: 15, height: 15, background: '#fff', border: `2px solid ${ACCENT}`, borderRadius: 4, cursor: 'nwse-resize' }}
+            />
+          )}
+        </div>
+
+        {/* Floating chip: Left / Right / Full / Inline + width % + Replace */}
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ position: 'absolute', top: Math.max(2, fg.y - 44), left: clamp(fg.x, 6, Math.max(6, width - 360)), display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #EAE4DA', borderRadius: 10, boxShadow: '0 8px 24px rgba(28,26,22,0.16)', padding: '5px 7px', whiteSpace: 'nowrap', zIndex: 8 }}
+        >
+          <div style={{ display: 'flex', gap: 1, background: '#F2EEE6', borderRadius: 7, padding: 2 }}>
+            {SIDES.map((s) => (
+              <button key={s} onClick={() => setSide(s!)} style={segBtn(s === 'full' ? 'Full' : s === 'inline' ? 'Inline' : s === 'left' ? 'Left' : 'Right', s!)}>
+                {s === 'full' ? 'Full' : s === 'inline' ? 'Inline' : s === 'left' ? 'Left' : 'Right'}
+              </button>
+            ))}
+          </div>
+          {isFloat && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, borderLeft: '1px solid #EAE4DA', paddingLeft: 8 }}>
+              <button onClick={() => stepWidth(-4)} style={{ width: 22, height: 22, border: '1px solid #E2DCD0', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#57534a' }}>–</button>
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#1c1a16', minWidth: 34, textAlign: 'center' }}>{geo.widthPct}%</span>
+              <button onClick={() => stepWidth(4)} style={{ width: 22, height: 22, border: '1px solid #E2DCD0', borderRadius: 6, background: '#fff', cursor: 'pointer', color: '#57534a' }}>+</button>
+            </div>
+          )}
+          <button onClick={() => fileInputRef.current?.click()} style={{ display: 'flex', alignItems: 'center', gap: 5, height: 24, padding: '0 9px', border: 'none', borderLeft: '1px solid #EAE4DA', background: 'transparent', cursor: 'pointer', color: '#57534a', fontSize: 12, fontWeight: 500 }}>
+            📎 {sm.attrs.image ? 'Replace' : 'Upload'}
+          </button>
         </div>
       </div>
     </div>
