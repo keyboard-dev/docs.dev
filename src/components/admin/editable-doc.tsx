@@ -10,7 +10,7 @@
  * itself. This is the editing view; the published page renders via pretext.
  */
 
-import { useMemo, useRef, useState, type CSSProperties } from 'react';
+import { createElement, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { parseDoc, serializeDoc, type Block } from './mdx-blocks';
 import { mdInlineToHtml, htmlToMdInline } from './inline-md';
 import { parseAttrs, serializeAttrs, type SpreadAttrs } from '@/components/pretext/spread-tag';
@@ -19,6 +19,19 @@ import { putAsset } from '@/lib/drafts';
 
 const ACCENT = 'var(--docsdev-accent, #c2571f)';
 const SIDES: Array<NonNullable<SpreadAttrs['side']>> = ['left', 'right', 'full', 'inline'];
+
+type CardItem = { title: string; href: string };
+function parseCards(raw: string): CardItem[] {
+  const items: CardItem[] = [];
+  for (const m of raw.matchAll(/<Card\b([^>]*?)\/?>/g)) {
+    const a = m[1] ?? '';
+    items.push({ title: (a.match(/title="([^"]*)"/) ?? [])[1] ?? '', href: (a.match(/href="([^"]*)"/) ?? [])[1] ?? '/' });
+  }
+  return items;
+}
+function serializeCards(items: CardItem[]): string {
+  return '<Cards>\n' + items.map((it) => `  <Card title="${it.title}" href="${it.href}" />`).join('\n') + '\n</Cards>';
+}
 
 function metaLine(fm: string, key: string): string {
   const m = fm.match(new RegExp(`^${key}:\\s*(.*)$`, 'm'));
@@ -42,6 +55,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
   const [blocks, setBlocks] = useState<Block[]>(initial.blocks);
   const [selFig, setSelFig] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const fileFor = useRef<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -94,6 +108,13 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     [next[index], next[j]] = [next[j]!, next[index]!];
     commitBlocks(next);
   }
+  function reorderTo(from: number, to: number) {
+    if (from === to || from < 0 || to < 0) return;
+    const next = blocks.slice();
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m!);
+    commitBlocks(next);
+  }
   const setMeta = (key: string, val: string) => {
     const fm = setMetaLine(frontmatter, key, val);
     setFrontmatter(fm);
@@ -121,17 +142,18 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     }
   }
 
-  const proseStyle: CSSProperties = { fontFamily: 'Georgia, serif', fontSize: 18, lineHeight: 1.72, color: '#2a2722', outline: 'none' };
-  const editable = (html: string, onBlurMd: (md: string) => void, style: CSSProperties) => (
-    <div
-      contentEditable
-      suppressContentEditableWarning
-      spellCheck={false}
-      style={{ ...style, outline: 'none' }}
-      onBlur={(e) => onBlurMd(htmlToMdInline(e.currentTarget))}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
+  // Render an editable element using a real tag (p/h2/…) so it inherits the
+  // page's .prose typography. Edits round-trip through inline markdown.
+  const edit = (tag: string, key: string, html: string, onBlurMd: (md: string) => void, style?: CSSProperties) =>
+    createElement(tag, {
+      key,
+      contentEditable: true,
+      suppressContentEditableWarning: true,
+      spellCheck: false,
+      style: { outline: 'none', ...style },
+      onBlur: (e: React.FocusEvent<HTMLElement>) => onBlurMd(htmlToMdInline(e.currentTarget)),
+      dangerouslySetInnerHTML: { __html: html },
+    });
 
   function renderSpread(b: Extract<Block, { type: 'spread' }>) {
     const a = parseAttrs(b.attrs);
@@ -232,7 +254,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
             </div>
           )}
         </div>
-        {editable(mdInlineToHtml(b.inner), (md) => update(b.id, { inner: md }), proseStyle)}
+        {edit('p', b.id + 'inner', mdInlineToHtml(b.inner), (md) => update(b.id, { inner: md }))}
       </div>
     );
   }
@@ -240,14 +262,9 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
   function renderBlock(b: Block) {
     switch (b.type) {
       case 'heading':
-        return (
-          <div key={b.id} contentEditable suppressContentEditableWarning spellCheck={false} onBlur={(e) => update(b.id, { text: e.currentTarget.textContent ?? '' })}
-            style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif', fontWeight: 600, fontSize: b.depth <= 2 ? 25 : 20, letterSpacing: '-0.02em', color: '#1c1a16', margin: '30px 0 14px', outline: 'none' }}>
-            {b.text}
-          </div>
-        );
+        return edit(`h${Math.min(6, Math.max(1, b.depth))}`, b.id, b.text, (md) => update(b.id, { text: md }));
       case 'prose':
-        return <div key={b.id} style={{ margin: '0 0 16px' }}>{editable(mdInlineToHtml(b.text), (md) => update(b.id, { text: md }), proseStyle)}</div>;
+        return edit('p', b.id, mdInlineToHtml(b.text), (md) => update(b.id, { text: md }));
       case 'code':
         return (
           <div key={b.id} style={{ margin: '4px 0 22px', borderRadius: 12, overflow: 'hidden', border: '1px solid #2a2722', background: '#1c1a16' }}>
@@ -260,18 +277,29 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
         );
       case 'callout':
         return (
-          <div key={b.id} style={{ display: 'flex', gap: 12, background: '#FBF2EA', border: '1px solid #F1DAC6', borderRadius: 11, padding: '15px 16px', margin: '4px 0 22px' }}>
+          <div key={b.id} style={{ display: 'flex', gap: 12, background: '#FBF2EA', border: '1px solid #F1DAC6', borderRadius: 11, padding: '15px 16px', margin: '16px 0' }}>
             <div style={{ flex: 'none', width: 20, height: 20, borderRadius: '50%', background: ACCENT, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, marginTop: 2 }}>i</div>
-            {editable(mdInlineToHtml(b.text), (md) => update(b.id, { text: md }), { flex: 1, fontFamily: 'Georgia, serif', fontSize: 15.5, color: '#6b4a2e', outline: 'none' })}
+            {edit('div', b.id, mdInlineToHtml(b.text), (md) => update(b.id, { text: md }), { flex: 1, fontSize: 15, color: '#6b4a2e' })}
           </div>
         );
-      case 'cards':
+      case 'cards': {
+        const items = parseCards(b.raw);
+        const setItems = (next: CardItem[]) => update(b.id, { raw: serializeCards(next) });
         return (
-          <pre key={b.id} contentEditable suppressContentEditableWarning spellCheck={false} onBlur={(e) => update(b.id, { raw: e.currentTarget.textContent ?? '' })}
-            style={{ margin: '4px 0 22px', padding: 14, borderRadius: 10, border: '1px dashed #E2DCD0', background: '#FAF8F4', fontFamily: 'ui-monospace, monospace', fontSize: 12.5, color: '#57534a', whiteSpace: 'pre-wrap', outline: 'none' }}>
-            {b.raw}
-          </pre>
+          <div key={b.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, margin: '16px 0' }}>
+            {items.map((it, i) => (
+              <div key={i} style={{ position: 'relative', border: '1px solid #EAE4DA', borderRadius: 12, padding: '14px 16px', background: '#fff' }}>
+                <button onClick={() => setItems(items.filter((_, j) => j !== i))} title="Remove card" style={{ position: 'absolute', top: 6, right: 6, width: 18, height: 18, border: 'none', background: 'transparent', color: '#b6b1a6', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                {edit('div', b.id + 't' + i, mdInlineToHtml(it.title), (md) => setItems(items.map((x, j) => (j === i ? { ...x, title: md } : x))), { fontWeight: 600, fontSize: 15, color: '#1c1a16' })}
+                {edit('div', b.id + 'h' + i, mdInlineToHtml(it.href), (md) => setItems(items.map((x, j) => (j === i ? { ...x, href: md } : x))), { fontSize: 12.5, color: '#8a857a', marginTop: 2 })}
+              </div>
+            ))}
+            <button onClick={() => setItems([...items, { title: 'New card', href: '/' }])} style={{ border: '1px dashed #E2DCD0', borderRadius: 12, padding: '14px 16px', background: 'transparent', color: ACCENT, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+              + Card
+            </button>
+          </div>
         );
+      }
       case 'spread':
         return <div key={b.id}>{renderSpread(b)}</div>;
     }
@@ -290,28 +318,39 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       </div>
       <div style={{ height: 1, background: '#EAE4DA', margin: '18px 0 26px' }} />
 
-      {insertRow(0)}
-      {blocks.map((b, i) => (
-        <div key={b.id}>
-          <div
-            onMouseEnter={() => setHoverId(b.id)}
-            onMouseLeave={() => setHoverId((h) => (h === b.id ? null : h))}
-            style={{ position: 'relative' }}
-          >
-            {hoverId === b.id && (
-              <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', right: -10, top: 0, display: 'flex', gap: 3, zIndex: 9 }}>
-                {[['↑', () => moveBlock(i, -1)], ['↓', () => moveBlock(i, 1)], ['✕', () => deleteBlock(b.id)]].map(([label, fn], k) => (
-                  <button key={k} onClick={fn as () => void} style={{ width: 22, height: 22, border: '1px solid #E2DCD0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12, color: label === '✕' ? '#c0392b' : '#57534a' }}>
-                    {label as string}
+      <div className="prose" style={{ maxWidth: 'none' }}>
+        {insertRow(0)}
+        {blocks.map((b, i) => (
+          <div key={b.id}>
+            <div
+              onMouseEnter={() => setHoverId(b.id)}
+              onMouseLeave={() => setHoverId((h) => (h === b.id ? null : h))}
+              onDragOver={(e) => { if (dragIndex !== null) e.preventDefault(); }}
+              onDrop={(e) => { e.preventDefault(); if (dragIndex !== null) reorderTo(dragIndex, i); setDragIndex(null); }}
+              style={{ position: 'relative', outline: dragIndex !== null && hoverId === b.id ? `2px dashed ${ACCENT}` : 'none', outlineOffset: 4 }}
+            >
+              {hoverId === b.id && (
+                <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: -34, top: 0, display: 'flex', flexDirection: 'column', gap: 3, zIndex: 9 }}>
+                  <button
+                    draggable
+                    onDragStart={() => setDragIndex(i)}
+                    onDragEnd={() => setDragIndex(null)}
+                    title="Drag to reorder"
+                    style={{ width: 22, height: 22, border: '1px solid #E2DCD0', borderRadius: 6, background: '#fff', cursor: 'grab', fontSize: 12, color: '#57534a', lineHeight: 1 }}
+                  >
+                    ⠿
                   </button>
-                ))}
-              </div>
-            )}
-            {renderBlock(b)}
+                  <button onClick={() => moveBlock(i, -1)} title="Move up" style={{ width: 22, height: 22, border: '1px solid #E2DCD0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12, color: '#57534a' }}>↑</button>
+                  <button onClick={() => moveBlock(i, 1)} title="Move down" style={{ width: 22, height: 22, border: '1px solid #E2DCD0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12, color: '#57534a' }}>↓</button>
+                  <button onClick={() => deleteBlock(b.id)} title="Delete" style={{ width: 22, height: 22, border: '1px solid #E2DCD0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12, color: '#c0392b' }}>✕</button>
+                </div>
+              )}
+              {renderBlock(b)}
+            </div>
+            {insertRow(i + 1)}
           </div>
-          {insertRow(i + 1)}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 
