@@ -42,11 +42,11 @@ function setMetaLine(fm: string, key: string, val: string): string {
   return fm.replace(/\n---\n?$/, `\n${key}: ${val}\n---\n`);
 }
 
-function figureStyle(side: string, widthPct: number): CSSProperties {
+function figureStyle(side: string, widthPct: number, top = 6): CSSProperties {
   if (side === 'full') return { float: 'none', width: '100%', margin: '8px 0 20px', clear: 'both' };
   if (side === 'inline') return { float: 'none', width: widthPct + '%', margin: '10px auto 20px', display: 'block' };
-  if (side === 'left') return { float: 'left', width: widthPct + '%', margin: '6px 24px 12px 0' };
-  return { float: 'right', width: widthPct + '%', margin: '6px 0 12px 24px' };
+  if (side === 'left') return { float: 'left', width: widthPct + '%', margin: `${top}px 24px 12px 0` };
+  return { float: 'right', width: widthPct + '%', margin: `${top}px 0 12px 24px` };
 }
 
 export function EditableDoc({ source, onChange }: { source: string; onChange: (next: string) => void }) {
@@ -159,6 +159,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     const a = parseAttrs(b.attrs);
     const side = a.side ?? 'right';
     const widthPct = a.width ?? 42;
+    const top = a.top ?? 6;
     const selected = selFig === b.id;
     const setAttr = (patch: Partial<SpreadAttrs>) => update(b.id, { attrs: serializeAttrs({ ...a, ...patch }) });
     const setAttrLocal = (patch: Partial<SpreadAttrs>) =>
@@ -171,20 +172,20 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       e.stopPropagation();
       setSelFig(b.id);
       let curSide = side;
+      let curTop = top;
+      const startY = e.clientY;
       const move = (ev: PointerEvent) => {
         const article = (document.querySelector('article') ?? document.body) as HTMLElement;
         const rect = article.getBoundingClientRect();
         const mid = rect.left + rect.width / 2;
-        const next = ev.clientX < mid - 40 ? 'left' : ev.clientX > mid + 40 ? 'right' : curSide;
-        if (next !== curSide) {
-          curSide = next;
-          setAttrLocal({ side: next });
-        }
+        curSide = ev.clientX < mid - 40 ? 'left' : ev.clientX > mid + 40 ? 'right' : curSide;
+        curTop = Math.max(0, Math.min(500, top + (ev.clientY - startY)));
+        setAttrLocal({ side: curSide, top: Math.round(curTop) });
       };
       const up = () => {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
-        setAttr({ side: curSide });
+        setAttr({ side: curSide, top: Math.round(curTop) });
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
@@ -211,7 +212,8 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       window.addEventListener('pointerup', up);
     }
     const visual = a.orb ? (
-      <div style={{ width: '100%', aspectRatio: '4 / 3', borderRadius: 12, background: 'radial-gradient(125% 125% at 30% 24%, #f6b079 0%, #e07a2c 38%, #c2571f 64%, #8f3d12 100%)', boxShadow: '0 12px 34px rgba(170,75,22,0.3)' }} />
+      // Match the published page exactly: the orb is a circle, not a rounded box.
+      <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: '50%', background: 'radial-gradient(125% 125% at 30% 24%, #f6b079 0%, #e07a2c 38%, #c2571f 64%, #8f3d12 100%)', boxShadow: '0 12px 34px rgba(170,75,22,0.30), inset 0 1px 0 rgba(255,255,255,0.45)' }} />
     ) : a.image ? (
       <DraftImage src={a.image} alt={a.alt ?? ''} style={{ width: '100%', aspectRatio: '4 / 3', objectFit: 'cover', borderRadius: 12, display: 'block' }} />
     ) : (
@@ -222,7 +224,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
         <div
           onClick={(e) => { e.stopPropagation(); setSelFig(b.id); }}
           onPointerDown={startDrag}
-          style={{ position: 'relative', cursor: 'grab', touchAction: 'none', ...figureStyle(side, widthPct), ...(selected ? { outline: `2px solid ${ACCENT}`, outlineOffset: 3, borderRadius: 14 } : null) }}
+          style={{ position: 'relative', cursor: 'grab', touchAction: 'none', ...figureStyle(side, widthPct, top), ...(selected ? { outline: `2px solid ${ACCENT}`, outlineOffset: 3, borderRadius: a.orb ? '50%' : 14 } : null) }}
         >
           {visual}
           {selected && (side === 'left' || side === 'right' || side === 'inline') && (
