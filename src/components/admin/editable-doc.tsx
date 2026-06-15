@@ -330,7 +330,12 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
               style={{ position: 'relative', outline: dragIndex !== null && hoverId === b.id ? `2px dashed ${ACCENT}` : 'none', outlineOffset: 4 }}
             >
               {hoverId === b.id && (
-                <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: -34, top: 0, display: 'flex', flexDirection: 'column', gap: 3, zIndex: 9 }}>
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  // Span all the way to the block's left edge (no gap) so moving
+                  // the cursor onto the controls doesn't trigger mouseleave.
+                  style={{ position: 'absolute', left: -38, top: 0, width: 38, paddingRight: 10, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, zIndex: 9 }}
+                >
                   <button
                     draggable
                     onDragStart={() => setDragIndex(i)}
