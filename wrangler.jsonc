@@ -15,6 +15,11 @@
   "vars": {
     "GITHUB_OWNER": "keyboard-dev",
     "GITHUB_REPO": "docs.dev",
-    "GITHUB_BRANCH": "main"
+    "GITHUB_BRANCH": "main",
+    // Team sign-in via docs.dev. Register your site in the docs.dev dashboard
+    // (redirect URI: https://<your-host>/api/admin/sso/callback), then paste
+    // the Site ID here. Leave empty for standalone PIN auth.
+    "DOCSDEV_SITE_ID": "",
+    "DOCSDEV_ISSUER": "https://app.docs.dev"
   }
 }

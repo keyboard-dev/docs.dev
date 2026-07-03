@@ -12,6 +12,7 @@ const ACCENT = 'var(--docsdev-accent, #c2571f)';
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [sso, setSso] = useState(false);
   const [pin, setPin] = useState('');
   const [pages, setPages] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -26,6 +27,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     void loadPages();
+    void fetch('/api/admin/session')
+      .then((r) => r.json())
+      .then((d: { sso?: boolean }) => setSso(Boolean(d.sso)))
+      .catch(() => {});
   }, [loadPages]);
 
   async function login(e: React.FormEvent) {
@@ -58,13 +63,22 @@ export default function AdminPage() {
     return (
       <main style={shell}>
         <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>docs.dev admin</h1>
-        <p style={{ color: '#8a857a', marginBottom: 24 }}>Enter the PIN to edit content.</p>
-        <form onSubmit={login} style={{ display: 'flex', gap: 12 }}>
-          <input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" maxLength={8} placeholder="PIN" autoFocus style={{ ...field, fontSize: 22, letterSpacing: '0.4em', width: 160, textAlign: 'center' }} />
-          <button type="submit" style={{ ...field, border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Sign in</button>
-        </form>
-        {error && <p style={{ color: '#c0392b', marginTop: 16 }}>{error}</p>}
-        <p style={{ color: '#b6b1a6', marginTop: 32, fontSize: 13 }}>Proof of concept — default PIN is <code>1234</code>.</p>
+        {sso ? (
+          <>
+            <p style={{ color: '#8a857a', marginBottom: 24 }}>Sign in with your docs.dev team account to edit content.</p>
+            <a href="/api/admin/sso/start" style={{ ...field, display: 'inline-block', border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, textDecoration: 'none' }}>Sign in with docs.dev</a>
+          </>
+        ) : (
+          <>
+            <p style={{ color: '#8a857a', marginBottom: 24 }}>Enter the PIN to edit content.</p>
+            <form onSubmit={login} style={{ display: 'flex', gap: 12 }}>
+              <input value={pin} onChange={(e) => setPin(e.target.value)} inputMode="numeric" maxLength={8} placeholder="PIN" autoFocus style={{ ...field, fontSize: 22, letterSpacing: '0.4em', width: 160, textAlign: 'center' }} />
+              <button type="submit" style={{ ...field, border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Sign in</button>
+            </form>
+            {error && <p style={{ color: '#c0392b', marginTop: 16 }}>{error}</p>}
+            <p style={{ color: '#b6b1a6', marginTop: 32, fontSize: 13 }}>Standalone mode — default PIN is <code>1234</code>. Set DOCSDEV_SITE_ID to use docs.dev team sign-in.</p>
+          </>
+        )}
       </main>
     );
   }

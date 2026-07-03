@@ -1,22 +1,24 @@
 /**
- * Admin session + content helpers (PROOF OF CONCEPT).
+ * Admin session + content helpers.
  *
- * Auth model: a 4-digit PIN (default 1234, override with ADMIN_PIN) unlocks an
- * httpOnly session cookie. The cookie stores an HMAC of a constant keyed by
- * ADMIN_SECRET — never the PIN — so it can't be forged just by guessing the
- * cookie name, and we can validate it statelessly (no session store needed).
+ * Two auth modes:
+ *  - docs.dev sign-in (recommended): set DOCSDEV_SITE_ID and sessions are
+ *    short-lived JWTs issued by the docs.dev service after it verifies the
+ *    user is a member of your team (see lib/docsdev-sso.ts). The PIN path is
+ *    disabled entirely in this mode.
+ *  - Legacy PIN (standalone fallback): a 4-digit PIN (default 1234, override
+ *    with ADMIN_PIN) unlocks an httpOnly cookie storing an HMAC of a constant
+ *    keyed by ADMIN_SECRET — never the PIN — validated statelessly.
  *
  * Edge-runtime safe: baseline content comes from a build-time manifest (no fs)
  * and edits are persisted via the GitHub API, so this runs unchanged on
  * Cloudflare Workers. `node:crypto` and Buffer work under `nodejs_compat`.
- *
- * Intentionally minimal — a production build would use real auth (e.g. a
- * GitHub App) rather than a PIN.
  */
 
 import { cookies } from 'next/headers';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { getDocSource, listDocSlugs } from './content';
+import { ssoEnabled, verifySsoToken, SSO_JWT_COOKIE, type SsoSession } from './docsdev-sso';
 
 const COOKIE = 'docsdev_admin';
 const ADMIN_PIN = process.env.ADMIN_PIN ?? '1234';
@@ -39,11 +41,24 @@ export function checkPin(pin: string): boolean {
 
 export const SESSION_COOKIE = COOKIE;
 
-export async function isAdmin(): Promise<boolean> {
+/**
+ * The signed-in editor session. Both roles ('admin' and 'editor') may edit;
+ * 'admin' additionally manages members. PIN sessions count as admin.
+ */
+export async function getAdminSession(): Promise<SsoSession | null> {
   const store = await cookies();
+  if (ssoEnabled()) {
+    const token = store.get(SSO_JWT_COOKIE)?.value;
+    if (!token) return null;
+    return verifySsoToken(token);
+  }
   const value = store.get(COOKIE)?.value;
-  if (!value) return false;
-  return safeEqual(value, sessionToken());
+  if (!value || !safeEqual(value, sessionToken())) return null;
+  return { email: 'admin@local', role: 'admin' };
+}
+
+export async function isAdmin(): Promise<boolean> {
+  return (await getAdminSession()) !== null;
 }
 
 /** Repo-relative path for a slug, e.g. "reading-experience" → "content/docs/reading-experience.mdx". */
