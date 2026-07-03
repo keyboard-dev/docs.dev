@@ -2,6 +2,14 @@
 
 **Documentation that reads like a designed page, not a stack of blocks.**
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/keyboard-dev/docs.dev)
+
+One click clones this repo into **your** GitHub account, deploys it to **your**
+Cloudflare account, and wires up push-to-deploy CI (Workers Builds). From there
+the repo is yours: edit it by hand, in the GitHub UI, or point
+[Claude Code](https://claude.com/claude-code) at it — the repo ships a
+`CLAUDE.md` and skills so an agent is productive immediately.
+
 docs.dev is a documentation framework built on [Fumadocs](https://fumadocs.dev)
 (Next.js + MDX) with one thing no other docs tool has: a reading experience
 powered by [pretext](https://github.com/chenglou/pretext), chenglou's
@@ -56,7 +64,22 @@ pnpm dev        # http://localhost:3000
 
 ## Deploy
 
-### Cloudflare Workers (primary)
+### One-click (recommended)
+
+Click the **Deploy to Cloudflare** button at the top of this README. Cloudflare
+will:
+
+1. clone this template into a new repository in your GitHub/GitLab account,
+2. build it with Workers Builds and deploy it to your Cloudflare account
+   (live at `<worker-name>.<your-subdomain>.workers.dev`, or a custom domain
+   you attach later), and
+3. redeploy automatically on every push to your new repo's default branch.
+
+After deploying, update `GITHUB_OWNER` / `GITHUB_REPO` in `wrangler.jsonc` to
+point at *your* new repository if you want the optional `/admin` web editor to
+publish (it commits via the GitHub API using your `GITHUB_PAT` secret).
+
+### Cloudflare Workers (manual)
 
 Runs on Workers via [OpenNext](https://opennext.js.org/cloudflare). No
 filesystem is used at runtime — baseline content comes from a build-time
