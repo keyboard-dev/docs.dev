@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { isAdmin, docRepoPath } from '@/lib/admin';
+import { docRepoPath, readSession, sealSession, SESSION_COOKIE, SESSION_MAX_AGE_S } from '@/lib/admin';
+import { repoCredential } from '@/lib/github-auth';
 import { gitConfig } from '@/lib/shared';
 
 /**
@@ -46,14 +47,17 @@ async function commitFile(
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+  const session = await readSession();
+  if (!session) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  const pat = process.env.GITHUB_PAT ?? process.env.GITHUB_TOKEN;
-  if (!pat) {
+  // Signed-in GitHub users publish with their own token — the commit is
+  // attributed to them in git history. PIN sessions use the server PAT.
+  const cred = await repoCredential(session);
+  if (!cred) {
     return NextResponse.json(
-      { ok: false, error: 'Server has no GITHUB_PAT configured.' },
+      { ok: false, error: 'No GitHub credential available (sign in with GitHub or configure GITHUB_PAT).' },
       { status: 500 },
     );
   }
@@ -76,7 +80,7 @@ export async function POST(request: Request) {
   const repo = process.env.GITHUB_REPO ?? gitConfig.repo;
   const branch = process.env.GITHUB_BRANCH ?? gitConfig.branch;
   const headers: GhHeaders = {
-    Authorization: `Bearer ${pat}`,
+    Authorization: `Bearer ${cred.token}`,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
     'User-Agent': 'docs.dev-admin',
@@ -107,12 +111,23 @@ export async function POST(request: Request) {
       branch,
       path,
       Buffer.from(content, 'utf8').toString('base64'),
-      `docs: edit ${path} via admin editor`,
+      `docs: edit ${path} via docs.dev editor`,
       headers,
     );
     if ('error' in r) return NextResponse.json({ ok: false, error: r.error }, { status: r.status });
 
-    return NextResponse.json({ ok: true, commitUrl: r.commitUrl });
+    const res = NextResponse.json({ ok: true, commitUrl: r.commitUrl });
+    // A token refresh may have produced an updated session — persist it.
+    if (cred.updated) {
+      res.cookies.set(SESSION_COOKIE, sealSession(cred.updated), {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: SESSION_MAX_AGE_S,
+      });
+    }
+    return res;
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: `Publish failed: ${(err as Error).message}` },

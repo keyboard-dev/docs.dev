@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isAdmin } from '@/lib/admin';
+import { isAdmin, readSession } from '@/lib/admin';
 import { getDraftStore } from '@/lib/draft-store';
 
 /**
@@ -34,7 +34,8 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ ok: false }, { status: 401 });
+  const session = await readSession();
+  if (!session) return NextResponse.json({ ok: false }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as {
     slug?: string;
     content?: string;
@@ -48,7 +49,12 @@ export async function PUT(request: Request) {
   try {
     const existing = await store.get(body.slug);
     const base = body.baseUpdatedAt ?? 0;
-    const author = (body.author ?? 'Anonymous').slice(0, 60);
+    // GitHub sessions carry a verified identity; PIN sessions fall back to
+    // the client's self-reported display name.
+    const author =
+      session.method === 'github'
+        ? (session.name || session.login).slice(0, 60)
+        : (body.author ?? 'Anonymous').slice(0, 60);
     if (existing && existing.updatedAt > base && existing.author !== author) {
       return NextResponse.json({ ok: false, conflict: existing }, { status: 409 });
     }

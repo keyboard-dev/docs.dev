@@ -27,7 +27,7 @@ import { EditableDoc } from './editable-doc';
 import { usePageDraft } from './use-page-draft';
 import { getMDXComponents } from '@/components/mdx';
 import { getDraft } from '@/lib/drafts';
-import { fetchServerDraft } from '@/lib/draft-sync';
+import { fetchServerDraft, primeEditorName } from '@/lib/draft-sync';
 
 const ACCENT = 'var(--docsdev-accent, #c2571f)';
 
@@ -286,7 +286,11 @@ export function InlineEditor() {
     let cancelled = false;
     fetch('/api/admin/session')
       .then((r) => r.json())
-      .then((d) => !cancelled && setAdmin(!!d.admin))
+      .then((d) => {
+        if (cancelled) return;
+        setAdmin(!!d.admin);
+        if (d.user?.method === 'github') primeEditorName(d.user.name || d.user.login);
+      })
       .catch(() => {});
     return () => {
       cancelled = true;

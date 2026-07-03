@@ -18,7 +18,7 @@ import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
 import { FilePlus2, Files, Trash2, X } from 'lucide-react';
 import { putDraft, deleteDraft } from '@/lib/drafts';
-import { editorName, listServerDrafts, pushServerDraft, deleteServerDraft } from '@/lib/draft-sync';
+import { editorName, listServerDrafts, primeEditorName, pushServerDraft, deleteServerDraft } from '@/lib/draft-sync';
 
 const ACCENT = 'var(--docsdev-accent, #c2571f)';
 
@@ -48,7 +48,11 @@ export function SidebarAdmin() {
     let cancelled = false;
     fetch('/api/admin/session')
       .then((r) => r.json())
-      .then((d) => !cancelled && setAdmin(!!d.admin))
+      .then((d) => {
+        if (cancelled) return;
+        setAdmin(!!d.admin);
+        if (d.user?.method === 'github') primeEditorName(d.user.name || d.user.login);
+      })
       .catch(() => {});
     return () => {
       cancelled = true;

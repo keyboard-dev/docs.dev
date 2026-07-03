@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { isAdmin, listDocs, docRepoPath } from '@/lib/admin';
+import { isAdmin, listDocs, docRepoPath, readSession } from '@/lib/admin';
+import { repoCredential } from '@/lib/github-auth';
 import { getDraftStore } from '@/lib/draft-store';
 import { gitConfig } from '@/lib/shared';
 
@@ -13,7 +14,8 @@ export async function GET() {
 /** Delete a published page: removes the MDX file from the repo (the page
  *  disappears from the site on the next build) and clears any shared draft. */
 export async function DELETE(request: Request) {
-  if (!(await isAdmin())) {
+  const session = await readSession();
+  if (!session) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   const url = new URL(request.url);
@@ -30,10 +32,10 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ ok: true, draftOnly: true });
   }
 
-  const pat = process.env.GITHUB_PAT ?? process.env.GITHUB_TOKEN;
-  if (!pat) {
+  const cred = await repoCredential(session);
+  if (!cred) {
     return NextResponse.json(
-      { ok: false, error: 'Server has no GITHUB_PAT configured — cannot delete published pages.' },
+      { ok: false, error: 'No GitHub credential available — cannot delete published pages.' },
       { status: 500 },
     );
   }
@@ -41,7 +43,7 @@ export async function DELETE(request: Request) {
   const repo = process.env.GITHUB_REPO ?? gitConfig.repo;
   const branch = process.env.GITHUB_BRANCH ?? gitConfig.branch;
   const headers = {
-    Authorization: `Bearer ${pat}`,
+    Authorization: `Bearer ${cred.token}`,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
     'User-Agent': 'docs.dev-admin',

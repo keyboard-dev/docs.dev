@@ -8,7 +8,16 @@ export type RemoteDraftMeta = Pick<RemoteDraft, 'slug' | 'updatedAt' | 'author'>
 
 const NAME_KEY = 'docsdev-editor-name';
 
+/** Verified identity from the session (GitHub sign-in), set by whichever
+ *  component fetches /api/admin/session first. Beats the self-reported name
+ *  and suppresses the name prompt entirely. */
+let sessionName: string | null = null;
+export function primeEditorName(name: string | null | undefined): void {
+  if (name) sessionName = name;
+}
+
 export function editorName(interactive = false): string {
+  if (sessionName) return sessionName;
   try {
     const saved = localStorage.getItem(NAME_KEY);
     if (saved) return saved;

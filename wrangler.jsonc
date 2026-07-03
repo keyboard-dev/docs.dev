@@ -9,7 +9,14 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  // Set secrets with `wrangler secret put GITHUB_PAT` (and ADMIN_PIN etc.).
+  // Set secrets with `wrangler secret put <NAME>`:
+  //   GITHUB_PAT                — server fallback credential (PIN sessions,
+  //                               shared drafts branch)
+  //   ADMIN_PIN, ADMIN_SECRET   — PIN sign-in + session sealing key
+  //   GITHUB_APP_CLIENT_ID      — GitHub App OAuth ("Sign in with GitHub":
+  //   GITHUB_APP_CLIENT_SECRET     register a GitHub App with callback URL
+  //                                <site>/api/auth/github/callback, enable
+  //                                user authorization, install on the repo)
   // Non-secret defaults can live here:
   "vars": {
     "GITHUB_OWNER": "keyboard-dev",
