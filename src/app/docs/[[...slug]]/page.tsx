@@ -12,11 +12,30 @@ import { getMDXComponents } from '@/components/mdx';
 import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { gitConfig } from '@/lib/shared';
+import { DraftShellNotice } from '@/components/admin/draft-shell-notice';
 
 export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const params = await props.params;
   const page = source.getPage(params.slug);
-  if (!page) notFound();
+  if (!page) {
+    // Unknown slug: for admins this is a *draft page* — a page that exists as
+    // a shared draft but hasn't been published/built yet. This branch renders
+    // statically (no server cookies here), so the admin gate is client-side:
+    // the in-place editor takes over for admins; everyone else sees a
+    // noindexed not-found notice.
+    return (
+      <DocsPage toc={[]}>
+        <DocsTitle>Untitled page</DocsTitle>
+        <DocsDescription className="mb-0">
+          This page hasn&apos;t been published yet.
+        </DocsDescription>
+        <div className="flex flex-row gap-2 items-center border-b pb-6" />
+        <DocsBody>
+          <DraftShellNotice />
+        </DocsBody>
+      </DocsPage>
+    );
+  }
 
   const MDX = page.data.body;
   const markdownUrl = getPageMarkdownUrl(page).url;
@@ -51,7 +70,8 @@ export async function generateStaticParams() {
 export async function generateMetadata(props: PageProps<'/docs/[[...slug]]'>): Promise<Metadata> {
   const params = await props.params;
   const page = source.getPage(params.slug);
-  if (!page) notFound();
+  // Unknown slugs render the admin draft shell (or 404 in the page itself).
+  if (!page) return { title: 'Draft page', robots: { index: false } };
 
   return {
     title: page.data.title,

@@ -20,13 +20,14 @@
 
 import { useCallback, useEffect, useState, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Eye, Pencil } from 'lucide-react';
 import * as runtime from 'react/jsx-runtime';
 import { EditableDoc } from './editable-doc';
 import { usePageDraft } from './use-page-draft';
 import { getMDXComponents } from '@/components/mdx';
 import { getDraft } from '@/lib/drafts';
+import { fetchServerDraft } from '@/lib/draft-sync';
 
 const ACCENT = 'var(--docsdev-accent, #c2571f)';
 
@@ -51,23 +52,34 @@ function useArticleTakeover(active: boolean): HTMLElement | null {
 
   useEffect(() => {
     if (!active) return;
-    const article = document.querySelector('article');
-    if (!article) return;
-    const container = document.createElement('div');
-    container.setAttribute('data-editor', '');
-    // The article is `flex flex-col gap-4`; the takeover replaces all items.
-    container.className = 'flex flex-col gap-4';
-    article.appendChild(container);
+    let container: HTMLElement | null = null;
+    let cancelled = false;
     const style = document.createElement('style');
     style.textContent = `article > :not([data-editor]) { display: none !important; }`;
     document.head.appendChild(style);
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) setHost(container);
-    });
+
+    // Client-side navigation can swap the <article> out from under us (e.g.
+    // "New page" navigates and then opens the editor), so attachment
+    // self-heals: whenever the container is missing or disconnected,
+    // re-attach to the current article.
+    const ensure = () => {
+      if (cancelled || container?.isConnected) return;
+      const article = document.querySelector('article');
+      if (!article) return;
+      container?.remove();
+      container = document.createElement('div');
+      container.setAttribute('data-editor', '');
+      // The article is `flex flex-col gap-4`; the takeover replaces all items.
+      container.className = 'flex flex-col gap-4';
+      article.appendChild(container);
+      setHost(container);
+    };
+    queueMicrotask(ensure);
+    const iv = setInterval(ensure, 400);
     return () => {
       cancelled = true;
-      container.remove();
+      clearInterval(iv);
+      container?.remove();
       style.remove();
       queueMicrotask(() => setHost(null));
     };
@@ -140,7 +152,7 @@ function PreviewInPlace({ source }: { source: string }) {
 }
 
 function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, published: boolean) => void }) {
-  const { source, revision, status, publishing, onChange, discard, publish, getCurrent } = usePageDraft(slug);
+  const { source, revision, status, publishing, conflict, onChange, discard, publish, adoptConflict, overwriteConflict, getCurrent } = usePageDraft(slug);
   const [mode, setMode] = useState<'edit' | 'preview'>('edit');
   // Snapshot of the draft for preview mode (kept in sync when toggling).
   const [previewSource, setPreviewSource] = useState('');
@@ -212,10 +224,20 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, 
             <span
               style={{
                 width: 7, height: 7, borderRadius: '50%', flex: 'none',
-                background: published ? 'var(--color-fd-success, #16a34a)' : ACCENT,
+                background: conflict ? 'var(--color-fd-error, #dc2626)' : published ? 'var(--color-fd-success, #16a34a)' : ACCENT,
               }}
             />
             {status}
+          </span>
+        )}
+        {conflict && (
+          <span style={{ display: 'flex', gap: 4 }}>
+            <button onClick={() => void adoptConflict()} style={{ ...ghost, height: 26, fontSize: 12 }}>
+              Load theirs
+            </button>
+            <button onClick={() => void overwriteConflict()} style={{ ...ghost, height: 26, fontSize: 12 }}>
+              Keep mine
+            </button>
           </span>
         )}
         <button onClick={onDiscard} style={ghost}>Discard</button>
@@ -248,10 +270,11 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, 
   );
 }
 
-type Override = { slug: string; source: string; kind: 'draft' | 'published' };
+type Override = { slug: string; source: string; kind: 'draft' | 'published'; author?: string };
 
 export function InlineEditor() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const slug = slugFromPath(pathname);
   const [admin, setAdmin] = useState(false);
   const [open, setOpen] = useState(false);
@@ -270,21 +293,41 @@ export function InlineEditor() {
     };
   }, []);
 
-  // Load the local draft whenever we're on a page and not editing.
+  // Load the draft (local cache or a teammate's shared draft — newest wins)
+  // whenever we're on a page and not editing.
   useEffect(() => {
     if (!admin || slug == null || open) return;
     let cancelled = false;
-    getDraft(slug)
-      .then((d) => {
+    Promise.all([getDraft(slug), fetchServerDraft(slug)])
+      .then(([local, remote]) => {
         if (cancelled) return;
-        if (d) setOverride({ slug, source: d.content, kind: 'draft' });
-        else setOverride((prev) => (prev && prev.kind === 'published' && prev.slug === slug ? prev : null));
+        const localAt = local?.updatedAt ?? 0;
+        const remoteAt = remote?.updatedAt ?? 0;
+        if (remote && remoteAt >= localAt) {
+          setOverride({ slug, source: remote.content, kind: 'draft', author: remote.author });
+        } else if (local) {
+          setOverride({ slug, source: local.content, kind: 'draft' });
+        } else {
+          setOverride((prev) => (prev && prev.kind === 'published' && prev.slug === slug ? prev : null));
+        }
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [admin, slug, open]);
+
+  // ?edit=1 opens the editor directly (used by "New page").
+  useEffect(() => {
+    if (!(admin && slug != null && searchParams.get('edit'))) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [admin, slug, searchParams]);
 
   const showOverride = !open && admin && slug != null && override != null && override.slug === slug;
   const liveHost = useArticleTakeover(showOverride);
@@ -309,7 +352,7 @@ export function InlineEditor() {
             <span
               title={
                 override.kind === 'draft'
-                  ? 'Showing your unpublished draft — the live site is unchanged'
+                  ? `Showing an unpublished draft${override.author ? ` by ${override.author}` : ''} — the live site is unchanged`
                   : 'Published — showing the new version while the site rebuilds'
               }
               style={{
