@@ -53,6 +53,7 @@ import {
   Minus,
   Plus,
   Quote as QuoteIcon,
+  Sparkles,
   Table as TableIcon,
   Trash2,
   Type,
@@ -263,6 +264,40 @@ function editableField(
 /* code block — same classes as the published Fumadocs CodeBlock       */
 /* ------------------------------------------------------------------ */
 
+const LANGS = [
+  'ts', 'tsx', 'js', 'jsx', 'json', 'bash', 'sh', 'python', 'go', 'rust',
+  'html', 'css', 'yaml', 'toml', 'md', 'mdx', 'sql', 'graphql', 'java', 'c',
+  'cpp', 'csharp', 'php', 'ruby', 'swift', 'kotlin', 'diff', 'txt', 'package-install',
+];
+
+/** Hover-revealed language dropdown for code blocks and code tabs. */
+function LangSelect({ value, onChange }: { value: string; onChange: (lang: string) => void }) {
+  const opts = !value || LANGS.includes(value) ? LANGS : [value, ...LANGS];
+  return (
+    <select
+      value={value || 'txt'}
+      onChange={(e) => onChange(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      aria-label="Language"
+      className="dd-langchip"
+      style={{
+        position: 'absolute', top: 6, right: 8, zIndex: 5, height: 22,
+        border: '1px solid var(--color-fd-border)', borderRadius: 6, outline: 'none',
+        background: 'var(--color-fd-popover)', padding: '0 6px',
+        fontFamily: 'ui-monospace, monospace', fontSize: 10.5, letterSpacing: '0.05em',
+        textTransform: 'uppercase', color: 'var(--color-fd-muted-foreground)', cursor: 'pointer',
+      }}
+    >
+      {opts.map((l) => (
+        <option key={l} value={l}>
+          {l}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function HighlightedCode({ code, lang }: { code: string; lang: string }) {
   const node = useShiki(code, {
     lang: lang || 'txt',
@@ -371,22 +406,7 @@ function EditorCode({
       data-block-index={index}
       className="my-4 bg-fd-card rounded-xl shiki relative border shadow-sm not-prose overflow-hidden text-sm"
     >
-      <input
-        value={b.lang}
-        onChange={(e) => onLang(e.target.value)}
-        onClick={(e) => e.stopPropagation()}
-        spellCheck={false}
-        aria-label="Language"
-        placeholder="lang"
-        className="dd-langchip"
-        style={{
-          position: 'absolute', top: 6, right: 8, zIndex: 5, width: 96, height: 22,
-          border: '1px solid var(--color-fd-border)', borderRadius: 6, outline: 'none',
-          background: 'var(--color-fd-popover)', padding: '0 8px', textAlign: 'right',
-          fontFamily: 'ui-monospace, monospace', fontSize: 10.5, letterSpacing: '0.08em',
-          textTransform: 'uppercase', color: 'var(--color-fd-muted-foreground)',
-        }}
-      />
+      <LangSelect value={b.lang} onChange={onLang} />
       {title != null && (
         <div className="flex text-fd-muted-foreground items-center gap-2 h-9.5 border-b px-4">
           <figcaption className="flex-1 truncate">{title}</figcaption>
@@ -468,22 +488,7 @@ function EditorTabs({
         <CodeBlockTab key={t.label} value={t.label}>
           {/* Same classes as the published nested CodeBlock (inTab variant). */}
           <figure className="bg-fd-secondary -mx-px -mb-px rounded-b-xl shiki relative border shadow-sm not-prose overflow-hidden text-sm" style={{ position: 'relative' }}>
-            <input
-              value={t.lang}
-              onChange={(e) => onCommit(b.tabs.map((x, j) => (j === ti ? { ...x, lang: e.target.value } : x)))}
-              onClick={(e) => e.stopPropagation()}
-              spellCheck={false}
-              aria-label="Language"
-              placeholder="lang"
-              className="dd-langchip"
-              style={{
-                position: 'absolute', top: 6, right: 8, zIndex: 5, width: 96, height: 22,
-                border: '1px solid var(--color-fd-border)', borderRadius: 6, outline: 'none',
-                background: 'var(--color-fd-popover)', padding: '0 8px', textAlign: 'right',
-                fontFamily: 'ui-monospace, monospace', fontSize: 10.5, letterSpacing: '0.08em',
-                textTransform: 'uppercase', color: 'var(--color-fd-muted-foreground)',
-              }}
-            />
+            <LangSelect value={t.lang} onChange={(lang) => onCommit(b.tabs.map((x, j) => (j === ti ? { ...x, lang } : x)))} />
             <CodeEditArea
               code={t.code}
               lang={t.lang}
@@ -512,6 +517,7 @@ function EditorSpread({
   onLiveInner,
   onCommitInner,
   onUpload,
+  onGenerateImage,
 }: {
   b: SpreadBlockT;
   index: number;
@@ -521,6 +527,7 @@ function EditorSpread({
   onLiveInner: (md: string) => void;
   onCommitInner: (md: string) => void;
   onUpload: () => void;
+  onGenerateImage?: () => void;
 }) {
   const committed = useMemo(() => parseAttrs(b.attrs), [b.attrs]);
   // During a drag we lay out from local attrs so pretext reflows the prose
@@ -630,6 +637,15 @@ function EditorSpread({
       >
         <Upload size={12} /> {a.image ? 'Replace image' : 'Upload image'}
       </button>
+      {onGenerateImage && (
+        <button
+          className="dd-chip-btn"
+          style={{ display: 'flex', alignItems: 'center', gap: 5, borderLeft: '1px solid var(--color-fd-border)', borderRadius: 0, paddingLeft: 9 }}
+          onClick={onGenerateImage}
+        >
+          <Sparkles size={12} /> Generate
+        </button>
+      )}
     </div>
   );
 
@@ -773,6 +789,7 @@ function EditorImage({
   onSelect,
   onAlt,
   onUpload,
+  onGenerate,
 }: {
   b: ImageBlockT;
   index: number;
@@ -780,6 +797,7 @@ function EditorImage({
   onSelect: () => void;
   onAlt: (alt: string) => void;
   onUpload: () => void;
+  onGenerate?: () => void;
 }) {
   return (
     <p
@@ -810,6 +828,11 @@ function EditorImage({
           <button className="dd-chip-btn" style={{ display: 'flex', alignItems: 'center', gap: 5 }} onClick={onUpload}>
             <Upload size={12} /> {b.src ? 'Replace' : 'Upload'}
           </button>
+          {onGenerate && (
+            <button className="dd-chip-btn" style={{ display: 'flex', alignItems: 'center', gap: 5 }} onClick={onGenerate}>
+              <Sparkles size={12} /> Generate
+            </button>
+          )}
           <input
             defaultValue={b.alt}
             placeholder="Alt text"
@@ -1009,7 +1032,25 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
   const [hover, setHover] = useState<{ index: number; top: number } | null>(null);
   const [gapHover, setGapHover] = useState<{ index: number; y: number } | null>(null);
   const [drag, setDrag] = useState<{ from: number; to: number; y: number } | null>(null);
-  const [toast, setToast] = useState<{ msg: string } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; undo?: boolean } | null>(null);
+  // "Generate with AI" popover (opened from the insert palette).
+  const [aiAt, setAiAt] = useState<{ index: number; y: number } | null>(null);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiSearch, setAiSearch] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [aiAvailable, setAiAvailable] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/ai/generate')
+      .then((r) => (r.ok ? r.json() : { available: false }))
+      .then((d) => !cancelled && setAiAvailable(!!d.available))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const proseRef = useRef<HTMLDivElement>(null);
@@ -1171,8 +1212,80 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
   function deleteBlock(id: string) {
     commitBlocks(stateRef.current.blocks.filter((b) => b.id !== id), { structural: true });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ msg: 'Block deleted' });
+    setToast({ msg: 'Block deleted', undo: true });
     toastTimer.current = setTimeout(() => setToast(null), 6000);
+  }
+
+  function notify(msg: string, ms = 4000) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg });
+    if (ms > 0) toastTimer.current = setTimeout(() => setToast(null), ms);
+  }
+
+  /* ---------------- AI generation ---------------- */
+
+  async function generateBlocks() {
+    const prompt = aiPrompt.trim();
+    if (!prompt || !aiAt || aiBusy) return;
+    setAiBusy(true);
+    setAiError('');
+    try {
+      const res = await fetch('/api/admin/ai/generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'doc',
+          prompt,
+          useSearch: aiSearch,
+          pageTitle: metaLine(stateRef.current.frontmatter, 'title'),
+          pageContext: serializeDoc({ frontmatter: '', blocks: stateRef.current.blocks }).slice(0, 6000),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; markdown?: string; error?: string };
+      if (!res.ok || !data.markdown) throw new Error(data.error ?? 'Generation failed.');
+      // The generated markdown becomes real editable blocks in place.
+      const generated = parseDoc(data.markdown).blocks;
+      if (generated.length === 0) throw new Error('The model returned no usable content.');
+      const next = stateRef.current.blocks.slice();
+      next.splice(aiAt.index, 0, ...generated);
+      commitBlocks(next, { structural: true });
+      setAiAt(null);
+      setAiPrompt('');
+      notify(`Inserted ${generated.length} generated block${generated.length === 1 ? '' : 's'} — edit them like anything else. ⌘Z undoes.`, 6000);
+    } catch (err) {
+      setAiError((err as Error).message);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function generateImageFor(id: string) {
+    const promptText = window.prompt('Describe the image to generate:')?.trim();
+    if (!promptText) return;
+    notify('Generating image…', 0);
+    try {
+      const res = await fetch('/api/admin/ai/generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'image', prompt: promptText }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; dataUrl?: string; contentType?: string; error?: string };
+      if (!res.ok || !data.dataUrl) throw new Error(data.error ?? 'Image generation failed.');
+      const ext = data.contentType === 'image/svg+xml' ? 'svg' : 'jpg';
+      const path = uploadPathFor(new File([], `ai-generated.${ext}`));
+      await putAsset({ path, contentType: data.contentType ?? 'image/jpeg', dataUrl: data.dataUrl });
+      const b = stateRef.current.blocks.find((x) => x.id === id);
+      const alt = promptText.slice(0, 120);
+      if (b?.type === 'spread') {
+        const a = parseAttrs(b.attrs);
+        update(id, { attrs: serializeAttrs({ ...a, orb: undefined, image: path, alt }) }, { structural: true });
+      } else if (b?.type === 'image') {
+        update(id, { src: path, alt }, { structural: true });
+      }
+      notify('Image generated ✓ — publish commits it to the repo.');
+    } catch (err) {
+      notify((err as Error).message, 6000);
+    }
   }
   function reorderTo(from: number, to: number) {
     if (from === to || from + 1 === to) return; // dropped in place
@@ -1535,6 +1648,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
             onSelect={() => setSelFig(b.id)}
             onAlt={(alt) => update(b.id, { alt })}
             onUpload={() => { fileFor.current = b.id; fileInput.current?.click(); }}
+            onGenerate={aiAvailable ? () => void generateImageFor(b.id) : undefined}
           />
         );
       case 'table':
@@ -1555,6 +1669,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
             onLiveInner={(md) => setLiveText(b.id, md)}
             onCommitInner={(md) => update(b.id, { inner: md })}
             onUpload={() => { fileFor.current = b.id; fileInput.current?.click(); }}
+            onGenerateImage={aiAvailable ? () => void generateImageFor(b.id) : undefined}
           />
         );
       case 'raw':
@@ -1650,10 +1765,18 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
             padding: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, width: 320,
           }}
         >
-          {PALETTE.map(({ type, label, icon }) => (
+          {[...PALETTE, ...(aiAvailable ? [{ type: 'ai', label: 'Generate with AI', icon: <Sparkles size={15} /> }] : [])].map(({ type, label, icon }) => (
             <button
               key={type}
-              onClick={() => insertBlock(type, insertAt.index)}
+              onClick={() => {
+                if (type === 'ai') {
+                  setAiAt({ index: insertAt.index, y: insertAt.y });
+                  setAiError('');
+                  setInsertAt(null);
+                  return;
+                }
+                insertBlock(type, insertAt.index);
+              }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', border: 'none',
                 background: 'transparent', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
@@ -1666,6 +1789,61 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
               {label}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* "Generate with AI" popover */}
+      {aiAt && (
+        <div
+          className="dd-pop"
+          data-dd-chrome
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: aiAt.y + 10, left: '50%', transform: 'translateX(-50%)', zIndex: 50,
+            width: 380, padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
+            fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'var(--color-fd-foreground)' }}>
+            <Sparkles size={14} style={{ color: ACCENT }} /> Generate documentation here
+          </div>
+          <textarea
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void generateBlocks();
+              if (e.key === 'Escape') setAiAt(null);
+            }}
+            autoFocus
+            rows={3}
+            placeholder="What should this section explain? e.g. “How to install and configure the CLI, with a quickstart example”"
+            style={{
+              resize: 'vertical', border: '1px solid var(--color-fd-border)', borderRadius: 8,
+              background: 'transparent', color: 'var(--color-fd-foreground)', fontSize: 13,
+              padding: '8px 10px', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5,
+            }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)', cursor: 'pointer', flex: 1 }}>
+              <input type="checkbox" checked={aiSearch} onChange={(e) => setAiSearch(e.target.checked)} />
+              Ground with web search
+            </label>
+            <button className="dd-chip-btn" style={{ height: 28 }} onClick={() => setAiAt(null)}>
+              Cancel
+            </button>
+            <button
+              onClick={() => void generateBlocks()}
+              disabled={aiBusy}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px',
+                borderRadius: 8, border: 'none', background: ACCENT, color: '#fff',
+                fontWeight: 600, fontSize: 12.5, cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.7 : 1,
+              }}
+            >
+              <Sparkles size={12} /> {aiBusy ? 'Generating…' : 'Generate'}
+            </button>
+          </div>
+          {aiError && <div style={{ fontSize: 12, color: 'var(--color-fd-error, #dc2626)' }}>{aiError}</div>}
         </div>
       )}
 
@@ -1767,6 +1945,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
           }}
         >
           {toast.msg}
+          {toast.undo && (
           <button
             onClick={undo}
             style={{
@@ -1777,6 +1956,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
           >
             <Undo2 size={12} /> Undo
           </button>
+          )}
         </div>
       )}
     </div>
