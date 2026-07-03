@@ -147,7 +147,15 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, 
   const host = useArticleTakeover(true);
   const published = status.startsWith('Published');
 
+  // Commit any in-progress field edit before a lifecycle action (some
+  // browsers don't move focus to buttons on click, so blur wouldn't fire).
+  const commitFocused = () => {
+    const el = document.activeElement as HTMLElement | null;
+    if (el?.isContentEditable) el.blur();
+  };
+
   const showPreview = useCallback(() => {
+    commitFocused();
     setPreviewSource(getCurrent());
     setMode('preview');
   }, [getCurrent]);
@@ -212,7 +220,10 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, 
         )}
         <button onClick={onDiscard} style={ghost}>Discard</button>
         <button
-          onClick={publish}
+          onClick={() => {
+            commitFocused();
+            publish();
+          }}
           disabled={publishing}
           style={{
             height: 30, padding: '0 14px', borderRadius: 8, border: 'none',
@@ -223,7 +234,15 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, 
         >
           {publishing ? 'Publishing…' : 'Publish'}
         </button>
-        <button onClick={() => onDone(getCurrent(), published)} style={ghost}>Done</button>
+        <button
+          onClick={() => {
+            commitFocused();
+            onDone(getCurrent(), published);
+          }}
+          style={ghost}
+        >
+          Done
+        </button>
       </div>
     </>
   );

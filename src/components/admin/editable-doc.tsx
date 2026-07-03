@@ -216,6 +216,22 @@ type FieldOpts = {
   onKeyDown?: (e: React.KeyboardEvent<HTMLElement>) => void;
 };
 
+/**
+ * React 19 re-applies dangerouslySetInnerHTML when the `{__html}` OBJECT
+ * identity changes, even if the string is identical — which would reset a
+ * contentEditable's DOM (wiping un-committed typing) on every unrelated
+ * re-render. Cache the object per field so unchanged content keeps the same
+ * identity and React leaves the DOM alone.
+ */
+const htmlObjCache = new Map<string, { __html: string }>();
+function stableHtml(id: string, html: string): { __html: string } {
+  const cur = htmlObjCache.get(id);
+  if (cur && cur.__html === html) return cur;
+  const next = { __html: html };
+  htmlObjCache.set(id, next);
+  return next;
+}
+
 function editableField(
   tag: string,
   id: string,
@@ -239,7 +255,7 @@ function editableField(
     onInput: (e: React.FormEvent<HTMLElement>) => onLiveMd(htmlToMdInline(e.currentTarget)),
     onKeyDown: opts?.onKeyDown,
     onBlur: (e: React.FocusEvent<HTMLElement>) => onCommitMd(htmlToMdInline(e.currentTarget)),
-    dangerouslySetInnerHTML: { __html: html },
+    dangerouslySetInnerHTML: stableHtml(id, html),
   });
 }
 
@@ -293,7 +309,9 @@ function CodeEditArea({
             placeCaret(el, 'end');
           }
         }}
-        onInput={(e) => onLive(e.currentTarget.textContent ?? '')}
+        // innerText (not textContent) so Enter-inserted <br>/<div> line
+        // breaks survive the round trip.
+        onInput={(e) => onLive(e.currentTarget.innerText ?? '')}
         onKeyDown={(e) => {
           if (e.key === 'Tab') {
             e.preventDefault();
@@ -301,7 +319,7 @@ function CodeEditArea({
           }
         }}
         onBlur={(e) => {
-          onCommit(e.currentTarget.textContent ?? '');
+          onCommit((e.currentTarget.innerText ?? '').replace(/\n$/, ''));
           setEditing(false);
         }}
         className="text-[0.8125rem] py-3.5 px-4"
@@ -701,7 +719,7 @@ function EditorSpread({
             setTextEditing(false);
           }}
           style={{ marginTop: 0 }}
-          dangerouslySetInnerHTML={{ __html: mdInlineToHtml(b.inner) }}
+          dangerouslySetInnerHTML={stableHtml(`${b.id}:inner`, mdInlineToHtml(b.inner))}
         />
       </div>
     );
@@ -839,7 +857,7 @@ function EditorTable({
       'data-rich-field': '1',
       style: { outline: 'none', minWidth: 60 },
       onBlur: (e: React.FocusEvent<HTMLElement>) => commitFromDom(e.currentTarget),
-      dangerouslySetInnerHTML: { __html: mdInlineToHtml(text) },
+      dangerouslySetInnerHTML: stableHtml(key, mdInlineToHtml(text)),
     });
   const cols = Math.max(b.header.length, 1);
   const tools: Array<[string, () => void]> = [
@@ -908,7 +926,7 @@ function EditorList({
     'data-block-index': index,
     onInput: (e: React.FormEvent<HTMLElement>) => onLive(itemsFromDom(e.currentTarget)),
     onBlur: (e: React.FocusEvent<HTMLElement>) => onCommit(itemsFromDom(e.currentTarget)),
-    dangerouslySetInnerHTML: { __html: b.items.map((it) => `<li>${mdInlineToHtml(it)}</li>`).join('') },
+    dangerouslySetInnerHTML: stableHtml(b.id, b.items.map((it) => `<li>${mdInlineToHtml(it)}</li>`).join('')),
   });
 }
 
@@ -1315,9 +1333,14 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
 
   const onHoverMove = (e: React.MouseEvent) => {
     if (insertAt || drag) return;
+    // Over the chrome itself (rail, insert line): freeze the current state so
+    // the controls can't vanish out from under the pointer.
+    if ((e.target as HTMLElement).closest('[data-dd-chrome]')) return;
     const prose = proseRef.current;
     if (!prose) return;
-    const y = e.clientY - prose.getBoundingClientRect().top;
+    const rect = prose.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     cancelAnimationFrame(hoverRaf.current);
     hoverRaf.current = requestAnimationFrame(() => {
       const rects = blockRects();
@@ -1326,12 +1349,16 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
         setGapHover(null);
         return;
       }
+      // The insert line only competes for the pointer inside the text column;
+      // in the left gutter (on the way to the rail) the rail always wins.
       let gap: { index: number; y: number } | null = null;
-      for (let k = 0; k <= rects.length; k++) {
-        const gy = gapAt(rects, k);
-        if (Math.abs(y - gy) <= 7) {
-          gap = { index: k, y: gy };
-          break;
+      if (x >= 0 && x <= rect.width) {
+        for (let k = 0; k <= rects.length; k++) {
+          const gy = gapAt(rects, k);
+          if (Math.abs(y - gy) <= 7) {
+            gap = { index: k, y: gy };
+            break;
+          }
         }
       }
       const hit = rects.find((r) => y >= r.top - 4 && y <= r.bottom + 4);
@@ -1564,12 +1591,15 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
 
   const chrome = (
     <>
-      {/* Hover rail */}
+      {/* Hover rail. The wrapper spans the whole gutter (rail → text edge) so
+          travelling from the block to the buttons never leaves the chrome. */}
       {hover && !drag && blocks[hover.index] && (
         <div
+          data-dd-chrome
           style={{
-            position: 'absolute', left: -36, top: hover.top + 2, display: 'flex',
-            flexDirection: 'column', gap: 2, zIndex: 30,
+            position: 'absolute', left: -44, width: 44, top: hover.top - 4,
+            paddingTop: 6, paddingBottom: 12, display: 'flex',
+            flexDirection: 'column', alignItems: 'flex-start', gap: 2, zIndex: 30,
           }}
         >
           <button className="dd-icon-btn" title="Drag to reorder" style={{ cursor: 'grab', touchAction: 'none' }} onPointerDown={(e) => startReorder(e, hover.index)}>
@@ -1587,6 +1617,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       {/* Insert line between blocks */}
       {gapHover && !drag && !insertAt && (
         <div
+          data-dd-chrome
           onClick={(e) => { e.stopPropagation(); openPaletteAtGap(gapHover.index); }}
           title="Insert a block"
           style={{
@@ -1612,6 +1643,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       {insertAt && (
         <div
           className="dd-pop"
+          data-dd-chrome
           onClick={(e) => e.stopPropagation()}
           style={{
             position: 'absolute', top: insertAt.y + 10, left: '50%', transform: 'translateX(-50%)', zIndex: 50,
