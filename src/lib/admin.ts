@@ -25,7 +25,11 @@ const ADMIN_PIN = process.env.ADMIN_PIN ?? '1234';
 const ADMIN_SECRET = process.env.ADMIN_SECRET ?? 'docs-dev-poc-secret';
 
 export function sessionToken(): string {
-  return createHmac('sha256', ADMIN_SECRET).update('admin-v1').digest('hex');
+  // Bind the token to the PIN, not just the secret. If an operator only
+  // changes the PIN (and forgets ADMIN_SECRET), a public reader of this repo
+  // still can't compute a valid cookie without also knowing the PIN — so
+  // there's one risk surface (the documented default PIN), not two.
+  return createHmac('sha256', ADMIN_SECRET).update(`admin-v1:${ADMIN_PIN}`).digest('hex');
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -37,6 +41,11 @@ function safeEqual(a: string, b: string): boolean {
 
 export function checkPin(pin: string): boolean {
   return safeEqual(pin, ADMIN_PIN);
+}
+
+/** Whether the deployment is still running the (publicly known) default PIN. */
+export function usingDefaultPin(): boolean {
+  return ADMIN_PIN === '1234';
 }
 
 export const SESSION_COOKIE = COOKIE;

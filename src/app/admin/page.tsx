@@ -13,6 +13,7 @@ const ACCENT = 'var(--docsdev-accent, #c2571f)';
 export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [sso, setSso] = useState(false);
+  const [defaultPin, setDefaultPin] = useState(false);
   const [pin, setPin] = useState('');
   const [pages, setPages] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -29,7 +30,10 @@ export default function AdminPage() {
     void loadPages();
     void fetch('/api/admin/session')
       .then((r) => r.json())
-      .then((d: { sso?: boolean }) => setSso(Boolean(d.sso)))
+      .then((d: { sso?: boolean; defaultPin?: boolean }) => {
+        setSso(Boolean(d.sso));
+        setDefaultPin(Boolean(d.defaultPin));
+      })
       .catch(() => {});
   }, [loadPages]);
 
@@ -56,6 +60,13 @@ export default function AdminPage() {
 
   const shell: React.CSSProperties = { maxWidth: 720, margin: '0 auto', padding: '56px 24px', fontFamily: 'ui-sans-serif, system-ui, sans-serif', color: '#1c1a16' };
   const field: React.CSSProperties = { padding: '10px 14px', borderRadius: 10, border: '1px solid #ccc', fontSize: 16 };
+  const warningBanner = defaultPin && (
+    <p style={{ background: '#fdf0e6', border: '1px solid #f0c9a0', color: '#8a4a12', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 20 }}>
+      ⚠️ This site is using the default PIN (<code>1234</code>), which anyone can find in the
+      public docs.dev template. Set an <code>ADMIN_PIN</code> secret, or switch to team sign-in
+      with <code>DOCSDEV_SITE_ID</code>.
+    </p>
+  );
 
   if (authed === null) return <main style={shell}>Loading…</main>;
 
@@ -63,6 +74,7 @@ export default function AdminPage() {
     return (
       <main style={shell}>
         <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>docs.dev admin</h1>
+        {warningBanner}
         {sso ? (
           <>
             <p style={{ color: '#8a857a', marginBottom: 24 }}>Sign in with your docs.dev team account to edit content.</p>
@@ -89,6 +101,7 @@ export default function AdminPage() {
         <h1 style={{ fontSize: 24, fontWeight: 800 }}>docs.dev admin</h1>
         <button onClick={logout} style={{ ...field, padding: '6px 14px', fontSize: 13, background: 'transparent', cursor: 'pointer' }}>Sign out</button>
       </div>
+      {warningBanner}
       <p style={{ color: '#8a857a', marginBottom: 20 }}>Pick a page to edit, or open it on the site and hit “Edit page”.</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {pages.map((p) => (
