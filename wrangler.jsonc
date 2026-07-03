@@ -5,6 +5,10 @@
   "compatibility_date": "2025-03-25",
   // nodejs_compat provides node:crypto / Buffer, which the admin auth uses.
   "compatibility_flags": ["nodejs_compat"],
+  // Without this, esbuild's keepNames injects __name(...) helpers into
+  // functions Next.js serializes into inline <script> tags, throwing
+  // "__name is not defined" in the browser on every page.
+  "keep_names": false,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
