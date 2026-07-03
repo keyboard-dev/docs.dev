@@ -6,10 +6,16 @@
  * editable blocks are portaled into the page's own <article>, so the sidebar,
  * table of contents, header, and column width are exactly the published page's.
  *
+ * Drafts stay real after you leave the editor: when an admin visits a page
+ * that has unpublished local edits (or has just published, before the site
+ * rebuilds), the draft is compiled through the real MDX pipeline and rendered
+ * in place of the stale build — what you saw when you hit Done is what you
+ * keep seeing.
+ *
  * The floating toolbar carries the draft lifecycle: an Edit ↔ Preview toggle
- * (preview compiles the draft MDX in place, inside the same article — never a
- * different-looking page), draft status, Discard (confirmed), Publish with
- * clear progress, and Done. All chrome uses the Fumadocs theme variables.
+ * (preview compiles the draft in place — never a different-looking page),
+ * draft status, Discard (confirmed), Publish with clear progress, and Done.
+ * All chrome uses the Fumadocs theme variables.
  */
 
 import { useCallback, useEffect, useState, type ComponentType } from 'react';
@@ -37,68 +43,20 @@ function splitFrontmatter(source: string): { title: string; description: string;
   return { title: get('title'), description: get('description'), body: source.slice(m[0].length) };
 }
 
-/** Renders the draft exactly as it will publish — same components, same
- *  chrome, same column — inside the page's own article. */
-function PreviewInPlace({ source }: { source: string }) {
-  const [Content, setContent] = useState<ComponentType<{ components?: unknown }> | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const { title, description, body } = splitFrontmatter(source);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { evaluate } = await import('@mdx-js/mdx');
-        if (cancelled) return;
-        setContent(null);
-        setError(null);
-        const mod = await evaluate(body, {
-          Fragment: runtime.Fragment,
-          jsx: runtime.jsx,
-          jsxs: runtime.jsxs,
-          baseUrl: window.location.href,
-        });
-        if (!cancelled) setContent(() => mod.default as ComponentType<{ components?: unknown }>);
-      } catch (err) {
-        if (!cancelled) setError((err as Error).message);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [body]);
-
-  return (
-    <>
-      <h1 className="text-[1.75em] font-semibold">{title}</h1>
-      {description && <p className="mb-0 text-lg text-fd-muted-foreground">{description}</p>}
-      <div style={{ height: 1, background: 'var(--color-fd-border)', margin: '24px 0' }} />
-      <div className="prose" style={{ maxWidth: 'none' }}>
-        {error ? (
-          <pre style={{ whiteSpace: 'pre-wrap', color: 'var(--color-fd-error, #dc2626)' }}>Preview error: {error}</pre>
-        ) : Content ? (
-          <Content components={getMDXComponents()} />
-        ) : (
-          <p style={{ color: 'var(--color-fd-muted-foreground)' }}>Rendering preview…</p>
-        )}
-      </div>
-    </>
-  );
-}
-
-function EditOverlay({ slug, onDone }: { slug: string; onDone: () => void }) {
-  const { source, revision, status, publishing, onChange, discard, publish, getCurrent } = usePageDraft(slug);
+/** Takes over the page's own <article>: hides its (stale) children and
+ *  returns a host container inside it, so anything portaled in sits in the
+ *  real page chrome — sidebar, TOC, column width and all. */
+function useArticleTakeover(active: boolean): HTMLElement | null {
   const [host, setHost] = useState<HTMLElement | null>(null);
-  const [mode, setMode] = useState<'edit' | 'preview'>('edit');
-  // Snapshot of the draft for preview mode (kept in sync when toggling).
-  const [previewSource, setPreviewSource] = useState('');
 
-  // Take over the page's own <article> so the chrome (sidebar/TOC/width) is real.
   useEffect(() => {
+    if (!active) return;
     const article = document.querySelector('article');
     if (!article) return;
     const container = document.createElement('div');
     container.setAttribute('data-editor', '');
+    // The article is `flex flex-col gap-4`; the takeover replaces all items.
+    container.className = 'flex flex-col gap-4';
     article.appendChild(container);
     const style = document.createElement('style');
     style.textContent = `article > :not([data-editor]) { display: none !important; }`;
@@ -111,8 +69,82 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: () => void }) {
       cancelled = true;
       container.remove();
       style.remove();
+      queueMicrotask(() => setHost(null));
     };
-  }, []);
+  }, [active]);
+
+  return active ? host : null;
+}
+
+/** Renders draft MDX exactly as it will publish — same components, same
+ *  remark/rehype pipeline (GFM tables, shiki highlighting), same chrome. */
+function PreviewInPlace({ source }: { source: string }) {
+  const [Content, setContent] = useState<ComponentType<{ components?: unknown }> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { title, description, body } = splitFrontmatter(source);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // Subpath imports keep node-only plugins (remark-image → node:fs)
+        // out of the client bundle. remark-npm turns package-install fences
+        // into the npm/pnpm/yarn/bun tabs, exactly like the build.
+        const [{ evaluate }, { rehypeCode }, { remarkGfm }, { remarkNpm }] = await Promise.all([
+          import('@mdx-js/mdx'),
+          import('fumadocs-core/mdx-plugins/rehype-code'),
+          import('fumadocs-core/mdx-plugins/remark-gfm'),
+          import('fumadocs-core/mdx-plugins/remark-npm'),
+        ]);
+        if (cancelled) return;
+        setContent(null);
+        setError(null);
+        const mod = await evaluate(body, {
+          Fragment: runtime.Fragment,
+          jsx: runtime.jsx,
+          jsxs: runtime.jsxs,
+          baseUrl: window.location.href,
+          remarkPlugins: [remarkGfm, remarkNpm],
+          rehypePlugins: [[rehypeCode, { lazy: true, fallbackLanguage: 'txt' }]],
+        });
+        if (!cancelled) setContent(() => mod.default as ComponentType<{ components?: unknown }>);
+      } catch (err) {
+        if (!cancelled) setError((err as Error).message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [body]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h1 className="text-[1.75em] font-semibold">{title}</h1>
+      {description && <p className="mb-0 text-lg text-fd-muted-foreground">{description}</p>}
+      <div className="flex flex-row gap-2 items-center border-b pb-6" aria-hidden>
+        <div style={{ height: 30, width: 132, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5 }} />
+        <div style={{ height: 30, width: 74, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5 }} />
+      </div>
+      <div className="prose flex-1">
+        {error ? (
+          <pre style={{ whiteSpace: 'pre-wrap', color: 'var(--color-fd-error, #dc2626)' }}>Preview error: {error}</pre>
+        ) : Content ? (
+          <Content components={getMDXComponents()} />
+        ) : (
+          <p style={{ color: 'var(--color-fd-muted-foreground)' }}>Rendering…</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, published: boolean) => void }) {
+  const { source, revision, status, publishing, onChange, discard, publish, getCurrent } = usePageDraft(slug);
+  const [mode, setMode] = useState<'edit' | 'preview'>('edit');
+  // Snapshot of the draft for preview mode (kept in sync when toggling).
+  const [previewSource, setPreviewSource] = useState('');
+  const host = useArticleTakeover(true);
+  const published = status.startsWith('Published');
 
   const showPreview = useCallback(() => {
     setPreviewSource(getCurrent());
@@ -137,8 +169,6 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: () => void }) {
     background: 'transparent', color: 'var(--color-fd-muted-foreground)', fontSize: 13, cursor: 'pointer',
     fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
   };
-
-  const published = status.startsWith('Published');
 
   return (
     <>
@@ -192,18 +222,22 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: () => void }) {
         >
           {publishing ? 'Publishing…' : 'Publish'}
         </button>
-        <button onClick={onDone} style={ghost}>Done</button>
+        <button onClick={() => onDone(getCurrent(), published)} style={ghost}>Done</button>
       </div>
     </>
   );
 }
+
+type Override = { slug: string; source: string; kind: 'draft' | 'published' };
 
 export function InlineEditor() {
   const pathname = usePathname();
   const slug = slugFromPath(pathname);
   const [admin, setAdmin] = useState(false);
   const [open, setOpen] = useState(false);
-  const [hasDraft, setHasDraft] = useState(false);
+  // When set, the article shows this source instead of the (stale) build:
+  // an unpublished local draft, or freshly-published content awaiting deploy.
+  const [override, setOverride] = useState<Override | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,22 +250,30 @@ export function InlineEditor() {
     };
   }, []);
 
-  // Unpublished-draft badge on the Edit button.
+  // Load the local draft whenever we're on a page and not editing.
   useEffect(() => {
     if (!admin || slug == null || open) return;
     let cancelled = false;
     getDraft(slug)
-      .then((d) => !cancelled && setHasDraft(!!d))
+      .then((d) => {
+        if (cancelled) return;
+        if (d) setOverride({ slug, source: d.content, kind: 'draft' });
+        else setOverride((prev) => (prev && prev.kind === 'published' && prev.slug === slug ? prev : null));
+      })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [admin, slug, open]);
 
+  const showOverride = !open && admin && slug != null && override != null && override.slug === slug;
+  const liveHost = useArticleTakeover(showOverride);
+
   if (!admin || slug == null) return null;
 
   return (
     <>
+      {showOverride && liveHost && createPortal(<PreviewInPlace source={override.source} />, liveHost)}
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -243,20 +285,32 @@ export function InlineEditor() {
           }}
         >
           <Pencil size={14} /> Edit page
-          {hasDraft && (
+          {showOverride && (
             <span
-              title="This page has an unpublished draft"
+              title={
+                override.kind === 'draft'
+                  ? 'Showing your unpublished draft — the live site is unchanged'
+                  : 'Published — showing the new version while the site rebuilds'
+              }
               style={{
                 marginLeft: 2, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
                 background: 'rgba(255,255,255,0.22)', borderRadius: 999, padding: '2px 8px',
               }}
             >
-              DRAFT
+              {override.kind === 'draft' ? 'DRAFT' : 'PUBLISHED ✓'}
             </span>
           )}
         </button>
       )}
-      {open && <EditOverlay slug={slug} onDone={() => setOpen(false)} />}
+      {open && (
+        <EditOverlay
+          slug={slug}
+          onDone={(source, published) => {
+            if (published) setOverride({ slug, source, kind: 'published' });
+            setOpen(false);
+          }}
+        />
+      )}
     </>
   );
 }

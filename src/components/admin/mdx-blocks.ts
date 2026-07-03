@@ -2,10 +2,13 @@
  * MDX ⇄ block model for the unified in-place editor.
  *
  * The editor needs to render a page as a list of editable blocks (prose,
- * heading, code, callout, cards, spread) and serialize them back to MDX without
- * losing content. This is a pragmatic line scanner — not a full mdast parser —
- * covering the block types docs.dev produces. Round-trip is verified to be
- * semantically stable (parse → serialize → parse is a fixed point).
+ * heading, code, callout, cards, spread, list, quote, image, table, divider)
+ * and serialize them back to MDX without losing content. This is a pragmatic
+ * line scanner — not a full mdast parser — covering the block types docs.dev
+ * produces. Anything it doesn't understand becomes a protected `raw` block
+ * that round-trips verbatim, so the editor never destroys what it can't
+ * represent. Round-trip is verified to be semantically stable
+ * (parse → serialize → parse is a fixed point).
  */
 
 export type Block =
@@ -15,9 +18,13 @@ export type Block =
   | { id: string; type: 'callout'; props: string; text: string }
   | { id: string; type: 'cards'; raw: string }
   | { id: string; type: 'spread'; attrs: string; inner: string }
-  /** Anything the editor doesn't understand (other JSX, imports, tables).
-   *  Rendered read-only and round-tripped verbatim — the editor never
-   *  destroys what it can't represent. */
+  | { id: string; type: 'list'; ordered: boolean; items: string[] }
+  | { id: string; type: 'quote'; text: string }
+  | { id: string; type: 'image'; src: string; alt: string }
+  | { id: string; type: 'table'; header: string[]; align: string[]; rows: string[][] }
+  | { id: string; type: 'hr' }
+  /** Anything the editor doesn't understand (other JSX, imports, nested
+   *  lists). Rendered read-only and round-tripped verbatim. */
   | { id: string; type: 'raw'; raw: string };
 
 export type ParsedDoc = { frontmatter: string; blocks: Block[] };
@@ -27,6 +34,10 @@ const nid = () => `b${(counter++).toString(36)}_${Date.now().toString(36)}`;
 
 const HEADING = /^(#{1,6})\s+(.*)$/;
 const FENCE = /^(```|~~~)(.*)$/;
+const HR = /^(?:-{3,}|\*{3,}|_{3,})$/;
+const IMAGE = /^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)$/;
+const LIST_ITEM = /^([-*+]|\d+[.)])\s+(.*)$/;
+const NESTED_LIST_ITEM = /^\s+([-*+]|\d+[.)])\s+/;
 
 function attrsOf(line: string, tag: string): string {
   const m = line.match(new RegExp(`<${tag}\\b([^>]*?)/?>`));
@@ -50,6 +61,17 @@ function collectUntilClose(lines: string[], start: number, closeTag: string): { 
   }
   return { inner: innerLines.join('\n').trim(), end: i };
 }
+
+function parseTableRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((c) => c.trim());
+}
+
+const TABLE_SEP_CELL = /^:?-{3,}:?$/;
 
 export function parseDoc(source: string): ParsedDoc {
   let body = source;
@@ -102,6 +124,100 @@ export function parseDoc(source: string): ParsedDoc {
       flushProse();
       blocks.push({ id: nid(), type: 'heading', depth: heading[1]!.length, text: heading[2]!.trim() });
       i++;
+      continue;
+    }
+
+    if (HR.test(trimmed)) {
+      flushProse();
+      blocks.push({ id: nid(), type: 'hr' });
+      i++;
+      continue;
+    }
+
+    const image = trimmed.match(IMAGE);
+    if (image) {
+      flushProse();
+      blocks.push({ id: nid(), type: 'image', alt: image[1] ?? '', src: image[2]! });
+      i++;
+      continue;
+    }
+
+    // Flat bullet / numbered lists. Nested lists are protected as raw so the
+    // structure survives untouched.
+    const listItem = trimmed.match(LIST_ITEM);
+    if (listItem && line === trimmed) {
+      flushProse();
+      const start = i;
+      const items: string[] = [];
+      let nested = false;
+      let j = i;
+      for (; j < lines.length; j++) {
+        const l = lines[j]!;
+        if (l.trim() === '') break;
+        if (NESTED_LIST_ITEM.test(l)) {
+          nested = true;
+          continue;
+        }
+        const m = l.trim().match(LIST_ITEM);
+        if (m && l === l.trimStart()) items.push(m[2]!);
+        else if (/^\s{2,}\S/.test(l) && items.length > 0) items[items.length - 1] += ' ' + l.trim();
+        else break;
+      }
+      if (nested) {
+        const rawLines: string[] = [];
+        let k = start;
+        for (; k < lines.length && lines[k]!.trim() !== ''; k++) rawLines.push(lines[k]!);
+        blocks.push({ id: nid(), type: 'raw', raw: rawLines.join('\n') });
+        i = k;
+      } else {
+        blocks.push({ id: nid(), type: 'list', ordered: /^\d/.test(listItem[1]!), items });
+        i = j;
+      }
+      continue;
+    }
+
+    if (/^>\s?/.test(trimmed)) {
+      flushProse();
+      const quote: string[] = [];
+      let j = i;
+      for (; j < lines.length; j++) {
+        const t = lines[j]!.trim();
+        if (!/^>\s?/.test(t)) break;
+        quote.push(t.replace(/^>\s?/, ''));
+      }
+      blocks.push({ id: nid(), type: 'quote', text: quote.join('\n') });
+      i = j;
+      continue;
+    }
+
+    // Markdown table: header row + separator row (+ body rows).
+    if (trimmed.startsWith('|')) {
+      const sep = lines[i + 1]?.trim() ?? '';
+      const sepCells = sep.startsWith('|') ? parseTableRow(sep) : [];
+      if (sepCells.length > 0 && sepCells.every((c) => TABLE_SEP_CELL.test(c))) {
+        flushProse();
+        const header = parseTableRow(trimmed);
+        const align = sepCells.map((c) =>
+          c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : c.startsWith(':') ? 'left' : '',
+        );
+        const rows: string[][] = [];
+        let j = i + 2;
+        for (; j < lines.length; j++) {
+          const t = lines[j]!.trim();
+          if (!t.startsWith('|')) break;
+          rows.push(parseTableRow(t));
+        }
+        blocks.push({ id: nid(), type: 'table', header, align, rows });
+        i = j;
+        continue;
+      }
+      // A lone pipe line without a separator: protect it.
+      flushProse();
+      const rawLines: string[] = [];
+      let j = i;
+      for (; j < lines.length && lines[j]!.trim().startsWith('|'); j++) rawLines.push(lines[j]!);
+      blocks.push({ id: nid(), type: 'raw', raw: rawLines.join('\n') });
+      i = j;
       continue;
     }
 
@@ -158,15 +274,14 @@ export function parseDoc(source: string): ParsedDoc {
       continue;
     }
 
-    // import/export statements and Markdown tables are also protected.
-    if (/^(import|export)\s/.test(trimmed) || trimmed.startsWith('|')) {
+    // import/export statements are also protected.
+    if (/^(import|export)\s/.test(trimmed)) {
       flushProse();
       const rawLines: string[] = [];
-      const isTable = trimmed.startsWith('|');
       let j = i;
       for (; j < lines.length; j++) {
         const t = lines[j]!.trim();
-        if (t === '' || (isTable ? !t.startsWith('|') : !/^(import|export)\s/.test(t))) break;
+        if (t === '' || !/^(import|export)\s/.test(t)) break;
         rawLines.push(lines[j]!);
       }
       blocks.push({ id: nid(), type: 'raw', raw: rawLines.join('\n') });
@@ -182,6 +297,20 @@ export function parseDoc(source: string): ParsedDoc {
   return { frontmatter, blocks };
 }
 
+function serializeTable(b: Extract<Block, { type: 'table' }>): string {
+  const cols = Math.max(b.header.length, ...b.rows.map((r) => r.length), b.align.length);
+  const pad = (row: string[]) => Array.from({ length: cols }, (_, i) => row[i] ?? '');
+  const line = (cells: string[]) => `| ${cells.join(' | ')} |`;
+  const sep = Array.from({ length: cols }, (_, i) => {
+    const a = b.align[i] ?? '';
+    if (a === 'center') return ':---:';
+    if (a === 'right') return '---:';
+    if (a === 'left') return ':---';
+    return '---';
+  });
+  return [line(pad(b.header)), line(sep), ...b.rows.map((r) => line(pad(r)))].join('\n');
+}
+
 export function serializeBlock(b: Block): string {
   switch (b.type) {
     case 'heading':
@@ -194,6 +323,19 @@ export function serializeBlock(b: Block): string {
       return `<Callout${b.props ? ' ' + b.props : ''}>\n${b.text}\n</Callout>`;
     case 'cards':
       return b.raw;
+    case 'list':
+      return b.items.map((it, i) => (b.ordered ? `${i + 1}. ${it}` : `- ${it}`)).join('\n');
+    case 'quote':
+      return b.text
+        .split('\n')
+        .map((l) => `> ${l}`)
+        .join('\n');
+    case 'image':
+      return `![${b.alt}](${b.src})`;
+    case 'table':
+      return serializeTable(b);
+    case 'hr':
+      return '---';
     case 'raw':
       return b.raw;
     case 'spread':

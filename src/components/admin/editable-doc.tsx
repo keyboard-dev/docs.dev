@@ -3,23 +3,25 @@
 /**
  * EditableDoc — the unified in-place editor.
  *
- * The page IS the editor. Every block renders through the same components the
- * published page uses — spreads lay out through the real pretext RichFlow (so
- * dragging a figure reflows the prose live through the production engine),
- * callouts are the real Fumadocs <Callout>, code highlights with the real
- * shiki pipeline — and editability is layered on top:
+ * The page IS the editor. Blocks render through the same components and the
+ * same CSS the published page uses — spreads lay out through the real pretext
+ * RichFlow (dragging a figure reflows the prose live through the production
+ * engine), callouts are the real Fumadocs <Callout>, code carries the real
+ * CodeBlock classes and shiki highlighting — and blocks are DIRECT children
+ * of the same `.prose` container, so margins collapse exactly like the
+ * published page. All editing chrome (hover rail, insert line, drop
+ * indicator, palette) lives in a floating overlay that never adds a pixel to
+ * the layout.
  *
- *   - zero layout shift: insert lines, hover rails and selection rings paint
- *     on hover/focus only, so entering edit mode changes nothing visually
+ * Editing affordances:
  *   - save-as-you-type: edits autosave (debounced) to the local draft
  *   - Enter splits a paragraph, Backspace at the start merges it back
  *   - structural undo/redo (⌘Z / ⇧⌘Z) with an undo toast on delete
  *   - a floating selection toolbar for bold / italic / code / links
- *   - unknown MDX (other JSX, imports, tables) is shown as a protected
- *     read-only block and round-trips verbatim
- *
- * All chrome uses the Fumadocs theme variables, so the editor is native in
- * light and dark mode and in any rebrand.
+ *   - base doc blocks: paragraphs, headings, lists, quotes, code, callouts,
+ *     cards, images, tables, dividers, spreads
+ *   - unknown MDX (other JSX, imports, nested lists) is a protected
+ *     read-only block that round-trips verbatim
  */
 
 import {
@@ -35,19 +37,23 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  ArrowDown,
-  ArrowUp,
   Bold,
   Code,
   GripVertical,
   Heading2,
   Image as ImageIcon,
+  ImagePlus,
   Info,
   Italic,
   LayoutGrid,
   Link as LinkIcon,
+  List,
+  ListOrdered,
   Lock,
+  Minus,
   Plus,
+  Quote as QuoteIcon,
+  Table as TableIcon,
   Trash2,
   Type,
   Undo2,
@@ -55,6 +61,7 @@ import {
   X,
 } from 'lucide-react';
 import { Callout } from 'fumadocs-ui/components/callout';
+import { Pre } from 'fumadocs-ui/components/codeblock';
 import { useShiki } from 'fumadocs-core/highlight/client';
 import { parseDoc, serializeDoc, type Block } from './mdx-blocks';
 import { mdInlineToHtml, htmlToMdInline } from './inline-md';
@@ -185,6 +192,7 @@ type FieldOpts = {
   placeholder?: string;
   style?: CSSProperties;
   className?: string;
+  index?: number;
   onKeyDown?: (e: React.KeyboardEvent<HTMLElement>) => void;
 };
 
@@ -206,6 +214,7 @@ function editableField(
     'data-block-id': id,
     'data-rich-field': '1',
     'data-placeholder': opts?.placeholder ?? '',
+    ...(opts?.index != null ? { 'data-block-index': opts.index } : null),
     onInput: (e: React.FormEvent<HTMLElement>) => onLiveMd(htmlToMdInline(e.currentTarget)),
     onKeyDown: opts?.onKeyDown,
     onBlur: (e: React.FocusEvent<HTMLElement>) => onCommitMd(htmlToMdInline(e.currentTarget)),
@@ -214,7 +223,7 @@ function editableField(
 }
 
 /* ------------------------------------------------------------------ */
-/* syntax-highlighted code block                                       */
+/* code block — same classes as the published Fumadocs CodeBlock       */
 /* ------------------------------------------------------------------ */
 
 function HighlightedCode({ code, lang }: { code: string; lang: string }) {
@@ -223,56 +232,66 @@ function HighlightedCode({ code, lang }: { code: string; lang: string }) {
     fallbackLanguage: 'txt',
     themes: { light: 'github-light', dark: 'github-dark' },
     defaultColor: false,
+    // The published page renders shiki output through the same Pre component.
+    components: { pre: Pre },
   });
   return <>{node}</>;
 }
 
 function PlainCode({ code }: { code: string }) {
   return (
-    <pre style={{ margin: 0, padding: '12px 16px', overflowX: 'auto', background: 'transparent' }}>
+    <Pre style={{ margin: 0, background: 'transparent' }}>
       <code>{code}</code>
-    </pre>
+    </Pre>
   );
 }
 
-type CodeBlock = Extract<Block, { type: 'code' }>;
+type CodeBlockT = Extract<Block, { type: 'code' }>;
 
 function EditorCode({
   b,
+  index,
   onLang,
   onLive,
   onCommit,
 }: {
-  b: CodeBlock;
+  b: CodeBlockT;
+  index: number;
   onLang: (lang: string) => void;
   onLive: (code: string) => void;
   onCommit: (code: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  // Match the published CodeBlock: a header row exists only when the fence
+  // has a title; the language is an on-hover chip so the geometry is
+  // identical to the real page.
+  const title = (b.meta.match(/title="([^"]*)"/) ?? [])[1];
   return (
-    <div
-      style={{
-        margin: '16px 0',
-        borderRadius: 12,
-        overflow: 'hidden',
-        border: '1px solid var(--color-fd-border)',
-        background: 'var(--color-fd-card)',
-      }}
+    <figure
+      data-block-index={index}
+      className="dd-codefig my-4 bg-fd-card rounded-xl shiki relative border shadow-sm not-prose overflow-hidden text-sm"
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderBottom: '1px solid var(--color-fd-border)' }}>
-        <input
-          value={b.lang}
-          onChange={(e) => onLang(e.target.value)}
-          spellCheck={false}
-          aria-label="Language"
-          placeholder="lang"
-          style={{
-            width: 100, border: 'none', outline: 'none', background: 'transparent',
-            fontFamily: 'ui-monospace, monospace', fontSize: 11, letterSpacing: '0.08em',
-            textTransform: 'uppercase', color: 'var(--color-fd-muted-foreground)',
-          }}
-        />
-      </div>
+      <input
+        value={b.lang}
+        onChange={(e) => onLang(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        spellCheck={false}
+        aria-label="Language"
+        placeholder="lang"
+        className="dd-langchip"
+        style={{
+          position: 'absolute', top: 6, right: 8, zIndex: 5, width: 96, height: 22,
+          border: '1px solid var(--color-fd-border)', borderRadius: 6, outline: 'none',
+          background: 'var(--color-fd-popover)', padding: '0 8px', textAlign: 'right',
+          fontFamily: 'ui-monospace, monospace', fontSize: 10.5, letterSpacing: '0.08em',
+          textTransform: 'uppercase', color: 'var(--color-fd-muted-foreground)',
+        }}
+      />
+      {title != null && (
+        <div className="flex text-fd-muted-foreground items-center gap-2 h-9.5 border-b px-4">
+          <figcaption className="flex-1 truncate">{title}</figcaption>
+        </div>
+      )}
       {editing ? (
         <pre
           contentEditable
@@ -295,9 +314,10 @@ function EditorCode({
             onCommit(e.currentTarget.textContent ?? '');
             setEditing(false);
           }}
+          className="text-[0.8125rem] py-3.5 px-4"
           style={{
-            margin: 0, padding: '12px 16px', outline: 'none',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13, lineHeight: 1.65,
+            margin: 0, outline: 'none',
+            fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)', lineHeight: 1.4286,
             whiteSpace: 'pre', overflowX: 'auto', color: 'var(--color-fd-foreground)',
           }}
         >
@@ -307,15 +327,15 @@ function EditorCode({
         <div
           onClick={() => setEditing(true)}
           title="Click to edit code"
-          className="dd-codeview"
-          style={{ cursor: 'text', fontSize: 13, lineHeight: 1.65 }}
+          className="dd-codeview text-[0.8125rem] py-3.5 overflow-auto max-h-[600px]"
+          style={{ cursor: 'text' }}
         >
           <Suspense fallback={<PlainCode code={b.code} />}>
             <HighlightedCode code={b.code} lang={b.lang} />
           </Suspense>
         </div>
       )}
-    </div>
+    </figure>
   );
 }
 
@@ -323,10 +343,11 @@ function EditorCode({
 /* spread block — the pretext moment                                   */
 /* ------------------------------------------------------------------ */
 
-type SpreadBlock = Extract<Block, { type: 'spread' }>;
+type SpreadBlockT = Extract<Block, { type: 'spread' }>;
 
 function EditorSpread({
   b,
+  index,
   selected,
   onSelect,
   onCommitAttrs,
@@ -334,7 +355,8 @@ function EditorSpread({
   onCommitInner,
   onUpload,
 }: {
-  b: SpreadBlock;
+  b: SpreadBlockT;
+  index: number;
   selected: boolean;
   onSelect: () => void;
   onCommitAttrs: (attrs: SpreadAttrs) => void;
@@ -489,7 +511,7 @@ function EditorSpread({
           ? { width: `${widthPct}%`, aspectRatio: a.orb ? '1' : '4 / 3', margin: '6px auto 14px', float: 'none' }
           : { width: `${widthPct}%`, aspectRatio: a.orb ? '1' : '4 / 3', float: side, margin: side === 'left' ? '6px 24px 12px 0' : '6px 0 12px 24px' };
     return (
-      <div style={{ display: 'flow-root' }}>
+      <div data-block-index={index} style={{ display: 'flow-root' }}>
         <div style={figStyle}>{visual}</div>
         <p
           contentEditable
@@ -532,6 +554,7 @@ function EditorSpread({
 
   return (
     <div
+      data-block-index={index}
       onClick={(e) => {
         // Clicking the prose (not the figure / a link) opens text editing.
         if ((e.target as HTMLElement).closest('[data-fig-ui]')) return;
@@ -548,6 +571,176 @@ function EditorSpread({
       />
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* image block                                                         */
+/* ------------------------------------------------------------------ */
+
+type ImageBlockT = Extract<Block, { type: 'image' }>;
+
+function EditorImage({
+  b,
+  index,
+  selected,
+  onSelect,
+  onAlt,
+  onUpload,
+}: {
+  b: ImageBlockT;
+  index: number;
+  selected: boolean;
+  onSelect: () => void;
+  onAlt: (alt: string) => void;
+  onUpload: () => void;
+}) {
+  return (
+    <p
+      data-block-index={index}
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      style={{ position: 'relative', cursor: 'pointer', ...(selected ? { outline: `2px solid ${ACCENT}`, outlineOffset: 3, borderRadius: 12 } : null) }}
+    >
+      {b.src ? (
+        <DraftImage src={b.src} alt={b.alt} className="rounded-lg" style={{ maxWidth: '100%', display: 'block' }} />
+      ) : (
+        <span
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 160,
+            borderRadius: 12, border: '1px dashed var(--color-fd-border)', background: 'var(--color-fd-card)',
+            color: 'var(--color-fd-muted-foreground)', fontSize: 13.5,
+          }}
+        >
+          <ImagePlus size={16} /> Click Upload to add an image
+        </span>
+      )}
+      {selected && (
+        <span
+          data-fig-ui
+          className="dd-pop"
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: 'absolute', top: -44, left: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', whiteSpace: 'nowrap', zIndex: 45 }}
+        >
+          <button className="dd-chip-btn" style={{ display: 'flex', alignItems: 'center', gap: 5 }} onClick={onUpload}>
+            <Upload size={12} /> {b.src ? 'Replace' : 'Upload'}
+          </button>
+          <input
+            defaultValue={b.alt}
+            placeholder="Alt text"
+            spellCheck={false}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={(e) => onAlt(e.target.value)}
+            style={{
+              width: 180, height: 24, border: '1px solid var(--color-fd-border)', borderRadius: 7,
+              background: 'transparent', color: 'var(--color-fd-foreground)', fontSize: 12, padding: '0 8px', outline: 'none',
+            }}
+          />
+        </span>
+      )}
+    </p>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* table block                                                         */
+/* ------------------------------------------------------------------ */
+
+type TableBlockT = Extract<Block, { type: 'table' }>;
+
+function EditorTable({
+  b,
+  index,
+  onCommit,
+}: {
+  b: TableBlockT;
+  index: number;
+  onCommit: (patch: { header: string[]; rows: string[][]; align?: string[] }) => void;
+}) {
+  const commitFromDom = (cell: HTMLElement) => {
+    const table = cell.closest('table');
+    if (!table) return;
+    const all = Array.from(table.rows).map((r) => Array.from(r.cells).map((c) => htmlToMdInline(c).trim()));
+    onCommit({ header: all[0] ?? [], rows: all.slice(1) });
+  };
+  const cell = (tag: 'th' | 'td', key: string, text: string) =>
+    createElement(tag, {
+      key,
+      contentEditable: true,
+      suppressContentEditableWarning: true,
+      spellCheck: false,
+      'data-rich-field': '1',
+      style: { outline: 'none', minWidth: 60 },
+      onBlur: (e: React.FocusEvent<HTMLElement>) => commitFromDom(e.currentTarget),
+      dangerouslySetInnerHTML: { __html: mdInlineToHtml(text) },
+    });
+  const cols = Math.max(b.header.length, 1);
+  const tools: Array<[string, () => void]> = [
+    ['+ Row', () => onCommit({ header: b.header, rows: [...b.rows, Array.from({ length: cols }, () => '')] })],
+    ['+ Col', () => onCommit({ header: [...b.header, ''], align: [...b.align, ''], rows: b.rows.map((r) => [...r, '']) })],
+    ['− Row', () => b.rows.length > 0 && onCommit({ header: b.header, rows: b.rows.slice(0, -1) })],
+    ['− Col', () => cols > 1 && onCommit({ header: b.header.slice(0, -1), align: b.align.slice(0, -1), rows: b.rows.map((r) => r.slice(0, -1)) })],
+  ];
+  return (
+    <div data-block-index={index} className="dd-tablewrap relative overflow-visible prose-no-margin my-6">
+      <div className="dd-tabletools dd-pop" style={{ position: 'absolute', top: -34, right: 0, display: 'flex', gap: 2, padding: 3, zIndex: 40 }}>
+        {tools.map(([label, fn]) => (
+          <button key={label} className="dd-chip-btn" style={{ height: 22 }} onClick={(e) => { e.stopPropagation(); fn(); }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="relative overflow-auto prose-no-margin">
+        <table>
+          <thead>
+            <tr>{b.header.map((h, i) => cell('th', `${b.id}h${i}`, h))}</tr>
+          </thead>
+          <tbody>
+            {b.rows.map((row, ri) => (
+              <tr key={`${b.id}r${ri}`}>{Array.from({ length: cols }, (_, ci) => cell('td', `${b.id}r${ri}c${ci}`, row[ci] ?? ''))}</tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* list block                                                          */
+/* ------------------------------------------------------------------ */
+
+type ListBlockT = Extract<Block, { type: 'list' }>;
+
+function itemsFromDom(root: HTMLElement): string[] {
+  return htmlToMdInline(root)
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function EditorList({
+  b,
+  index,
+  onLive,
+  onCommit,
+}: {
+  b: ListBlockT;
+  index: number;
+  onLive: (items: string[]) => void;
+  onCommit: (items: string[]) => void;
+}) {
+  return createElement(b.ordered ? 'ol' : 'ul', {
+    key: b.id,
+    contentEditable: true,
+    suppressContentEditableWarning: true,
+    spellCheck: false,
+    className: 'dd-field',
+    'data-block-id': b.id,
+    'data-rich-field': '1',
+    'data-block-index': index,
+    onInput: (e: React.FormEvent<HTMLElement>) => onLive(itemsFromDom(e.currentTarget)),
+    onBlur: (e: React.FocusEvent<HTMLElement>) => onCommit(itemsFromDom(e.currentTarget)),
+    dangerouslySetInnerHTML: { __html: b.items.map((it) => `<li>${mdInlineToHtml(it)}</li>`).join('') },
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -605,25 +798,37 @@ type Snapshot = { frontmatter: string; blocks: Block[] };
 const PALETTE: Array<{ type: string; label: string; icon: ReactNode }> = [
   { type: 'prose', label: 'Paragraph', icon: <Type size={15} /> },
   { type: 'heading', label: 'Heading', icon: <Heading2 size={15} /> },
-  { type: 'callout', label: 'Callout', icon: <Info size={15} /> },
+  { type: 'list', label: 'Bullet list', icon: <List size={15} /> },
+  { type: 'olist', label: 'Numbered list', icon: <ListOrdered size={15} /> },
+  { type: 'quote', label: 'Quote', icon: <QuoteIcon size={15} /> },
   { type: 'code', label: 'Code block', icon: <Code size={15} /> },
+  { type: 'callout', label: 'Callout', icon: <Info size={15} /> },
   { type: 'cards', label: 'Cards', icon: <LayoutGrid size={15} /> },
+  { type: 'image', label: 'Image', icon: <ImagePlus size={15} /> },
+  { type: 'table', label: 'Table', icon: <TableIcon size={15} /> },
   { type: 'spread', label: 'Spread (figure)', icon: <ImageIcon size={15} /> },
+  { type: 'hr', label: 'Divider', icon: <Minus size={15} /> },
 ];
+
+type BlockRect = { index: number; top: number; bottom: number };
 
 export function EditableDoc({ source, onChange }: { source: string; onChange: (next: string) => void }) {
   const initial = useMemo(() => parseDoc(source), [source]);
   const [frontmatter, setFrontmatter] = useState(initial.frontmatter);
   const [blocks, setBlocks] = useState<Block[]>(initial.blocks);
   const [selFig, setSelFig] = useState<string | null>(null);
-  const [insertAt, setInsertAt] = useState<number | null>(null);
-  const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
+  const [insertAt, setInsertAt] = useState<{ index: number; y: number } | null>(null);
+  const [hover, setHover] = useState<{ index: number; top: number } | null>(null);
+  const [gapHover, setGapHover] = useState<{ index: number; y: number } | null>(null);
+  const [drag, setDrag] = useState<{ from: number; to: number; y: number } | null>(null);
   const [toast, setToast] = useState<{ msg: string } | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
+  const proseRef = useRef<HTMLDivElement>(null);
   const fileFor = useRef<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverRaf = useRef(0);
 
   // Latest committed state, for callbacks and the autosave debounce.
   // (Assigned in a layout effect — before any user event can read it.)
@@ -652,9 +857,10 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       const withLive = s.blocks.map((b) => {
         const t = liveTexts.current[b.id];
         if (t == null) return b;
-        if (b.type === 'prose' || b.type === 'heading' || b.type === 'callout') return { ...b, text: t };
+        if (b.type === 'prose' || b.type === 'heading' || b.type === 'callout' || b.type === 'quote') return { ...b, text: t };
         if (b.type === 'spread') return { ...b, inner: t };
         if (b.type === 'code') return { ...b, code: t };
+        if (b.type === 'list') return { ...b, items: t.split('\n').filter(Boolean) };
         return b;
       });
       let fm = s.frontmatter;
@@ -672,6 +878,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
   useEffect(() => () => {
     if (liveTimer.current) clearTimeout(liveTimer.current);
     if (toastTimer.current) clearTimeout(toastTimer.current);
+    cancelAnimationFrame(hoverRaf.current);
   }, []);
 
   const record = () => {
@@ -703,6 +910,11 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
   // (inside a field, the browser's native text undo applies).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setInsertAt(null);
+        setSelFig(null);
+        return;
+      }
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
       const active = document.activeElement as HTMLElement | null;
       if (active?.isContentEditable || active instanceof HTMLInputElement) return;
@@ -745,6 +957,12 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       case 'code': return { id, type: 'code', lang: 'ts', meta: '', code: 'const x = 1;' };
       case 'cards': return { id, type: 'cards', raw: '<Cards>\n  <Card title="Title" href="/" />\n</Cards>' };
       case 'spread': return { id, type: 'spread', attrs: 'orb side="right" width="42%"', inner: 'Describe this figure — the prose here flows around it, laid out live by pretext.' };
+      case 'list': return { id, type: 'list', ordered: false, items: ['First item'] };
+      case 'olist': return { id, type: 'list', ordered: true, items: ['First item'] };
+      case 'quote': return { id, type: 'quote', text: 'A line worth quoting.' };
+      case 'image': return { id, type: 'image', src: '', alt: '' };
+      case 'table': return { id, type: 'table', header: ['Column', 'Column'], align: [], rows: [['', '']] };
+      case 'hr': return { id, type: 'hr' };
       default: return { id, type: 'prose', text: '' };
     }
   }
@@ -754,21 +972,18 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     next.splice(index, 0, b);
     setInsertAt(null);
     commitBlocks(next, { structural: true });
-    if (b.type === 'prose' || b.type === 'heading') focusReq.current = { id: b.id, at: 'end' };
+    if (b.type === 'prose' || b.type === 'heading' || b.type === 'quote' || b.type === 'list') focusReq.current = { id: b.id, at: 'end' };
+    if (b.type === 'image') {
+      fileFor.current = b.id;
+      fileInput.current?.click();
+    }
+    if (b.type === 'spread' || b.type === 'image') setSelFig(b.id);
   }
   function deleteBlock(id: string) {
     commitBlocks(stateRef.current.blocks.filter((b) => b.id !== id), { structural: true });
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ msg: 'Block deleted' });
     toastTimer.current = setTimeout(() => setToast(null), 6000);
-  }
-  function moveBlock(index: number, dir: -1 | 1) {
-    const j = index + dir;
-    const cur = stateRef.current.blocks;
-    if (j < 0 || j >= cur.length) return;
-    const next = cur.slice();
-    [next[index], next[j]] = [next[j]!, next[index]!];
-    commitBlocks(next, { structural: true });
   }
   function reorderTo(from: number, to: number) {
     if (from === to || from + 1 === to) return; // dropped in place
@@ -844,30 +1059,93 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     if (b && b.type === 'spread') {
       const a = parseAttrs(b.attrs);
       update(id, { attrs: serializeAttrs({ ...a, orb: undefined, image: path, alt: file.name }) }, { structural: true });
+    } else if (b && b.type === 'image') {
+      update(id, { src: path, alt: b.alt || file.name }, { structural: true });
     }
   }
+
+  /* ---------------- chrome geometry (overlay) ---------------- */
+
+  function blockRects(): BlockRect[] {
+    const prose = proseRef.current;
+    if (!prose) return [];
+    const pr = prose.getBoundingClientRect();
+    return Array.from(prose.querySelectorAll<HTMLElement>('[data-block-index]'))
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        return { index: Number(el.dataset.blockIndex), top: r.top - pr.top, bottom: r.bottom - pr.top };
+      })
+      .sort((a, b) => a.index - b.index);
+  }
+
+  function gapAt(rects: BlockRect[], k: number): number {
+    if (rects.length === 0) return 0;
+    if (k <= 0) return rects[0]!.top - 6;
+    if (k >= rects.length) return rects[rects.length - 1]!.bottom + 6;
+    return (rects[k - 1]!.bottom + rects[k]!.top) / 2;
+  }
+
+  const onHoverMove = (e: React.MouseEvent) => {
+    if (insertAt || drag) return;
+    const prose = proseRef.current;
+    if (!prose) return;
+    const y = e.clientY - prose.getBoundingClientRect().top;
+    cancelAnimationFrame(hoverRaf.current);
+    hoverRaf.current = requestAnimationFrame(() => {
+      const rects = blockRects();
+      if (rects.length === 0) {
+        setHover(null);
+        setGapHover(null);
+        return;
+      }
+      let gap: { index: number; y: number } | null = null;
+      for (let k = 0; k <= rects.length; k++) {
+        const gy = gapAt(rects, k);
+        if (Math.abs(y - gy) <= 7) {
+          gap = { index: k, y: gy };
+          break;
+        }
+      }
+      const hit = rects.find((r) => y >= r.top - 4 && y <= r.bottom + 4);
+      setGapHover(gap);
+      setHover(gap ? null : hit ? { index: hit.index, top: hit.top } : null);
+    });
+  };
+  const clearHover = () => {
+    if (insertAt) return;
+    setHover(null);
+    setGapHover(null);
+  };
 
   /* ---------------- pointer-based reorder ---------------- */
 
   function startReorder(e: React.PointerEvent, index: number) {
     e.preventDefault();
-    const root = rootRef.current;
-    if (!root) return;
-    const indexAt = (clientY: number) => {
-      const els = Array.from(root.querySelectorAll<HTMLElement>('[data-block-index]'));
-      for (const el of els) {
-        const r = el.getBoundingClientRect();
-        if (clientY < r.top + r.height / 2) return Number(el.dataset.blockIndex);
+    const prose = proseRef.current;
+    if (!prose) return;
+    const target = (clientY: number) => {
+      const rects = blockRects();
+      const y = clientY - prose.getBoundingClientRect().top;
+      let to = rects.length;
+      for (const r of rects) {
+        if (y < (r.top + r.bottom) / 2) {
+          to = r.index;
+          break;
+        }
       }
-      return els.length;
+      return { to, y: gapAt(rects, to) };
     };
-    setDrag({ from: index, to: index });
-    const move = (ev: PointerEvent) => setDrag({ from: index, to: indexAt(ev.clientY) });
+    setHover(null);
+    setGapHover(null);
+    const first = target(e.clientY);
+    setDrag({ from: index, ...first });
+    const move = (ev: PointerEvent) => setDrag({ from: index, ...target(ev.clientY) });
     const up = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      const { to } = target(ev.clientY);
       setDrag(null);
-      reorderTo(index, indexAt(ev.clientY));
+      reorderTo(index, to);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -883,23 +1161,41 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     opts?: FieldOpts,
   ) => editableField(tag, id, html, (md) => setLiveText(id, md), onCommitMd, opts);
 
-  function renderBlock(b: Block) {
+  function renderBlock(b: Block, i: number) {
     switch (b.type) {
       case 'heading':
         return field(`h${Math.min(6, Math.max(1, b.depth))}`, b.id, mdInlineToHtml(b.text), (md) => update(b.id, { text: md }), {
           placeholder: 'Heading',
+          index: i,
           onKeyDown: proseKeys(b),
         });
       case 'prose':
         return field('p', b.id, mdInlineToHtml(b.text), (md) => update(b.id, { text: md }), {
-          placeholder: 'Type something, or press + to insert a block…',
+          placeholder: 'Type something…',
+          index: i,
           onKeyDown: proseKeys(b),
         });
+      case 'quote':
+        return field('blockquote', b.id, mdInlineToHtml(b.text), (md) => update(b.id, { text: md }), {
+          placeholder: 'Quote',
+          index: i,
+        });
+      case 'list':
+        return (
+          <EditorList
+            key={b.id}
+            b={b}
+            index={i}
+            onLive={(items) => setLiveText(b.id, items.join('\n'))}
+            onCommit={(items) => update(b.id, { items })}
+          />
+        );
       case 'code':
         return (
           <EditorCode
             key={b.id}
             b={b}
+            index={i}
             onLang={(lang) => update(b.id, { lang })}
             onLive={(code) => setLiveText(b.id, code)}
             onCommit={(code) => update(b.id, { code })}
@@ -908,7 +1204,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       case 'callout': {
         const type = (b.props.match(/type="(\w+)"/) ?? [])[1] ?? 'info';
         return (
-          <Callout key={b.id} type={type as 'info'}>
+          <Callout key={b.id} type={type as 'info'} data-block-index={i}>
             {field('div', b.id, mdInlineToHtml(b.text), (md) => update(b.id, { text: md }), { placeholder: 'Callout text' })}
           </Callout>
         );
@@ -917,54 +1213,74 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
         const items = parseCards(b.raw);
         const setItems = (next: CardItem[]) => update(b.id, { raw: serializeCards(next) });
         return (
-          <div key={b.id} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, margin: '16px 0' }}>
-            {items.map((it, i) => (
-              <div key={i} style={{ position: 'relative', border: '1px solid var(--color-fd-border)', borderRadius: 12, padding: '14px 16px', background: 'var(--color-fd-card)' }}>
+          <div key={b.id} data-block-index={i} className="dd-tablewrap grid grid-cols-2 gap-3 @container" style={{ position: 'relative' }}>
+            {/* Add-card is an overlay chip (like the table tools), so the grid
+                keeps the exact geometry of the published <Cards>. */}
+            <div className="dd-tabletools dd-pop" style={{ position: 'absolute', top: -34, right: 0, display: 'flex', gap: 2, padding: 3, zIndex: 40 }}>
+              <button
+                className="dd-chip-btn"
+                style={{ height: 22, display: 'flex', alignItems: 'center', gap: 4 }}
+                onClick={(e) => { e.stopPropagation(); setItems([...items, { title: 'New card', href: '/' }]); }}
+              >
+                <Plus size={12} /> Card
+              </button>
+            </div>
+            {items.map((it, ci) => (
+              <div key={ci} className="not-prose block rounded-xl border bg-fd-card p-4 text-fd-card-foreground" style={{ position: 'relative' }}>
                 <button
-                  onClick={() => setItems(items.filter((_, j) => j !== i))}
+                  onClick={() => setItems(items.filter((_, j) => j !== ci))}
                   title="Remove card"
-                  className="dd-icon-btn"
-                  data-danger="1"
-                  style={{ position: 'absolute', top: 6, right: 6, width: 20, height: 20, border: 'none', background: 'transparent' }}
+                  style={{ position: 'absolute', top: 6, right: 6, border: 'none', background: 'transparent', color: 'var(--color-fd-muted-foreground)', cursor: 'pointer', display: 'flex' }}
                 >
                   <X size={12} />
                 </button>
-                {editableField(
-                  'div',
-                  `${b.id}t${i}`,
-                  mdInlineToHtml(it.title),
-                  () => {},
-                  (md) => setItems(items.map((x, j) => (j === i ? { ...x, title: md } : x))),
-                  { placeholder: 'Card title', style: { fontWeight: 600, fontSize: 15, color: 'var(--color-fd-foreground)' } },
-                )}
-                {editableField(
-                  'div',
-                  `${b.id}h${i}`,
-                  mdInlineToHtml(it.href),
-                  () => {},
-                  (md) => setItems(items.map((x, j) => (j === i ? { ...x, href: md } : x))),
-                  { placeholder: '/path', style: { fontSize: 12.5, color: 'var(--color-fd-muted-foreground)', marginTop: 2 } },
-                )}
+                {editableField('h3', `${b.id}t${ci}`, mdInlineToHtml(it.title), () => {}, (md) => setItems(items.map((x, j) => (j === ci ? { ...x, title: md } : x))), {
+                  placeholder: 'Card title',
+                  className: 'not-prose mb-1 text-sm font-medium',
+                })}
+                {/* The link target edits in a floating chip (shown on hover),
+                    so the card keeps the published <Card> geometry. */}
+                <input
+                  defaultValue={it.href}
+                  placeholder="/path"
+                  spellCheck={false}
+                  className="dd-langchip"
+                  onClick={(e) => e.stopPropagation()}
+                  onBlur={(e) => setItems(items.map((x, j) => (j === ci ? { ...x, href: e.target.value } : x)))}
+                  style={{
+                    position: 'absolute', bottom: -11, left: 12, right: 12, height: 22, zIndex: 5,
+                    border: '1px solid var(--color-fd-border)', borderRadius: 6, outline: 'none',
+                    background: 'var(--color-fd-popover)', padding: '0 8px',
+                    fontFamily: 'ui-monospace, monospace', fontSize: 11, color: 'var(--color-fd-muted-foreground)',
+                  }}
+                />
               </div>
             ))}
-            <button
-              onClick={() => setItems([...items, { title: 'New card', href: '/' }])}
-              style={{
-                border: '1px dashed var(--color-fd-border)', borderRadius: 12, padding: '14px 16px',
-                background: 'transparent', color: ACCENT, cursor: 'pointer', fontSize: 14, fontWeight: 600,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 64,
-              }}
-            >
-              <Plus size={14} /> Card
-            </button>
           </div>
         );
       }
+      case 'image':
+        return (
+          <EditorImage
+            key={b.id}
+            b={b}
+            index={i}
+            selected={selFig === b.id}
+            onSelect={() => setSelFig(b.id)}
+            onAlt={(alt) => update(b.id, { alt })}
+            onUpload={() => { fileFor.current = b.id; fileInput.current?.click(); }}
+          />
+        );
+      case 'table':
+        return <EditorTable key={b.id} b={b} index={i} onCommit={(patch) => update(b.id, patch)} />;
+      case 'hr':
+        return <hr key={b.id} data-block-index={i} />;
       case 'spread':
         return (
           <EditorSpread
             key={b.id}
             b={b}
+            index={i}
             selected={selFig === b.id}
             onSelect={() => setSelFig(b.id)}
             onCommitAttrs={(attrs) => update(b.id, { attrs: serializeAttrs(attrs) }, { structural: true })}
@@ -977,9 +1293,11 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
         return (
           <div
             key={b.id}
-            title="This block contains custom MDX the visual editor keeps as-is. Move or delete it here; edit it in the source file."
+            data-block-index={i}
+            title="This block contains MDX the visual editor keeps as-is (custom components, nested lists…). Move or delete it here; edit it in the source file."
+            className="not-prose my-4"
             style={{
-              margin: '16px 0', border: '1px dashed var(--color-fd-border)', borderRadius: 12,
+              border: '1px dashed var(--color-fd-border)', borderRadius: 12,
               background: 'var(--color-fd-card)', padding: '10px 14px', opacity: 0.85,
             }}
           >
@@ -994,66 +1312,103 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     }
   }
 
-  /* ---------------- insert row ---------------- */
+  /* ---------------- chrome overlay ---------------- */
 
-  function insertRow(index: number) {
-    const open = insertAt === index;
-    return (
-      <div className="dd-insert" onClick={(e) => e.stopPropagation()}>
-        <div
-          className="dd-insert-hit"
-          data-open={open}
-          onClick={() => setInsertAt(open ? null : index)}
-          title="Insert a block"
-        >
-          <div className="dd-insert-line" />
-          <div
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 22, height: 22, margin: '0 8px', borderRadius: 7, flex: 'none',
-              border: '1px solid var(--color-fd-border)', background: 'var(--color-fd-popover)', color: ACCENT,
-              transform: open ? 'rotate(45deg)' : 'none', transition: 'transform 0.15s ease',
-            }}
-          >
-            <Plus size={14} />
-          </div>
-          <div className="dd-insert-line" />
-        </div>
-        {open && (
-          <div
-            className="dd-pop"
-            style={{
-              position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 50,
-              padding: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, width: 300,
-            }}
-          >
-            {PALETTE.map(({ type, label, icon }) => (
-              <button
-                key={type}
-                onClick={() => insertBlock(type, index)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', border: 'none',
-                  background: 'transparent', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                  fontSize: 13.5, fontWeight: 500, color: 'var(--color-fd-foreground)',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-              >
-                <span style={{ color: 'var(--color-fd-muted-foreground)', display: 'flex' }}>{icon}</span>
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    );
+  function openPaletteAtGap(index: number) {
+    const rects = blockRects();
+    setInsertAt({ index, y: gapAt(rects, index) });
+    setGapHover(null);
+    setHover(null);
   }
+
+  const chrome = (
+    <>
+      {/* Hover rail */}
+      {hover && !drag && blocks[hover.index] && (
+        <div
+          style={{
+            position: 'absolute', left: -36, top: hover.top + 2, display: 'flex',
+            flexDirection: 'column', gap: 2, zIndex: 30,
+          }}
+        >
+          <button className="dd-icon-btn" title="Drag to reorder" style={{ cursor: 'grab', touchAction: 'none' }} onPointerDown={(e) => startReorder(e, hover.index)}>
+            <GripVertical size={13} />
+          </button>
+          <button className="dd-icon-btn" title="Insert below" onClick={(e) => { e.stopPropagation(); openPaletteAtGap(hover.index + 1); }}>
+            <Plus size={13} />
+          </button>
+          <button className="dd-icon-btn" data-danger="1" title="Delete block" onClick={(e) => { e.stopPropagation(); deleteBlock(blocks[hover.index]!.id); }}>
+            <Trash2 size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* Insert line between blocks */}
+      {gapHover && !drag && !insertAt && (
+        <div
+          onClick={(e) => { e.stopPropagation(); openPaletteAtGap(gapHover.index); }}
+          title="Insert a block"
+          style={{
+            position: 'absolute', left: 0, right: 0, top: gapHover.y - 10, height: 20,
+            display: 'flex', alignItems: 'center', cursor: 'pointer', zIndex: 30,
+          }}
+        >
+          <div style={{ flex: 1, height: 2, borderRadius: 1, background: 'color-mix(in srgb, var(--docsdev-accent, #c2571f) 45%, transparent)' }} />
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20,
+              margin: '0 8px', borderRadius: 6, flex: 'none', border: '1px solid var(--color-fd-border)',
+              background: 'var(--color-fd-popover)', color: ACCENT,
+            }}
+          >
+            <Plus size={13} />
+          </div>
+          <div style={{ flex: 1, height: 2, borderRadius: 1, background: 'color-mix(in srgb, var(--docsdev-accent, #c2571f) 45%, transparent)' }} />
+        </div>
+      )}
+
+      {/* Palette */}
+      {insertAt && (
+        <div
+          className="dd-pop"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: insertAt.y + 10, left: '50%', transform: 'translateX(-50%)', zIndex: 50,
+            padding: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, width: 320,
+          }}
+        >
+          {PALETTE.map(({ type, label, icon }) => (
+            <button
+              key={type}
+              onClick={() => insertBlock(type, insertAt.index)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', border: 'none',
+                background: 'transparent', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                fontSize: 13.5, fontWeight: 500, color: 'var(--color-fd-foreground)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span style={{ color: 'var(--color-fd-muted-foreground)', display: 'flex' }}>{icon}</span>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Drop indicator during reorder */}
+      {drag && <div className="dd-drop-line" style={{ top: drag.y - 1 }} />}
+    </>
+  );
 
   /* ---------------- render ---------------- */
 
   return (
     <div
       ref={rootRef}
+      className="flex flex-col gap-4"
+      onMouseMove={onHoverMove}
+      onMouseLeave={clearHover}
       onClick={() => {
         setSelFig(null);
         setInsertAt(null);
@@ -1084,46 +1439,23 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       >
         {metaLine(frontmatter, 'description')}
       </p>
-      <div style={{ height: 1, background: 'var(--color-fd-border)', margin: '24px 0' }} />
+      {/* Ghost of the published page's copy-markdown row, so the content
+          below starts at exactly the same y as the real page. */}
+      <div className="flex flex-row gap-2 items-center border-b pb-6" aria-hidden style={{ pointerEvents: 'none' }}>
+        <div style={{ height: 30, width: 132, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5 }} />
+        <div style={{ height: 30, width: 74, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5 }} />
+      </div>
 
-      <div className="prose" style={{ maxWidth: 'none' }}>
-        {insertRow(0)}
+      {/* Blocks are DIRECT children of the same .prose container the published
+          page uses — sibling margins collapse identically. The editing chrome
+          lives in the absolutely-positioned overlay below. */}
+      <div ref={proseRef} className="prose flex-1" style={{ position: 'relative' }}>
         {/* The block factories close over latest-value refs (autosave buffer,
             snapshot) that are only ever read inside event handlers; the rule's
             interprocedural trace can't see that. React Compiler is not enabled. */}
         {/* eslint-disable-next-line react-hooks/refs */}
-        {blocks.map((b, i) => (
-          <div key={b.id} style={{ position: 'relative' }}>
-            {drag && drag.to === i && <div className="dd-drop-line" style={{ top: -2 }} />}
-            <div
-              className="dd-block"
-              data-block-index={i}
-              style={{ position: 'relative', opacity: drag?.from === i ? 0.45 : 1 }}
-            >
-              <div className="dd-rail" style={{ left: -34 }} data-active={drag?.from === i}>
-                <button className="dd-icon-btn" title="Drag to reorder" style={{ cursor: 'grab', touchAction: 'none' }} onPointerDown={(e) => startReorder(e, i)}>
-                  <GripVertical size={13} />
-                </button>
-                <button className="dd-icon-btn" title="Move up" onClick={() => moveBlock(i, -1)}>
-                  <ArrowUp size={13} />
-                </button>
-                <button className="dd-icon-btn" title="Move down" onClick={() => moveBlock(i, 1)}>
-                  <ArrowDown size={13} />
-                </button>
-                <button className="dd-icon-btn" data-danger="1" title="Delete block" onClick={() => deleteBlock(b.id)}>
-                  <Trash2 size={13} />
-                </button>
-              </div>
-              {renderBlock(b)}
-            </div>
-            {insertRow(i + 1)}
-          </div>
-        ))}
-        {drag && drag.to === blocks.length && (
-          <div style={{ position: 'relative' }}>
-            <div className="dd-drop-line" style={{ top: -2 }} />
-          </div>
-        )}
+        {blocks.map((b, i) => renderBlock(b, i))}
+        {chrome}
       </div>
 
       {/* Selection toolbar */}

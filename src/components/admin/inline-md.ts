@@ -12,12 +12,14 @@ function escapeHtml(s: string): string {
 }
 
 export function mdInlineToHtml(md: string): string {
-  let s = escapeHtml(md);
+  // Markdown soft breaks: a single newline inside a paragraph renders as a
+  // space (exactly what the published pipeline does), so hard-wrapped source
+  // lines don't become visual line breaks in the editor.
+  let s = escapeHtml(md.replace(/\n+/g, ' '));
   s = s.replace(/`([^`]+)`/g, (_m, c) => `<code>${c}</code>`);
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, t, u) => `<a href="${u}">${t}</a>`);
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-  s = s.replace(/\n/g, '<br>');
   return s;
 }
 

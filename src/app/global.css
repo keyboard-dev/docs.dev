@@ -45,40 +45,6 @@ html > body[data-scroll-locked] {
 /* in-place editor                                                     */
 /* ------------------------------------------------------------------ */
 
-/* Insert affordance between blocks: zero layout footprint. The hit zone
-   straddles the gap between two blocks; the line + button only paint on
-   hover, so entering edit mode changes nothing until you reach for it. */
-.dd-insert {
-  position: relative;
-  height: 0;
-}
-
-.dd-insert-hit {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -10px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  z-index: 30;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-
-.dd-insert-hit:hover,
-.dd-insert-hit[data-open='true'] {
-  opacity: 1;
-}
-
-.dd-insert-line {
-  flex: 1;
-  height: 2px;
-  border-radius: 1px;
-  background: color-mix(in srgb, var(--docsdev-accent, #c2571f) 45%, transparent);
-}
-
 /* Editable fields: invisible at rest, a whisper of accent on hover, a clear
    ring while focused. */
 .dd-field {
@@ -102,22 +68,17 @@ html > body[data-scroll-locked] {
   pointer-events: none;
 }
 
-/* Block hover rail (drag handle + actions). */
-.dd-rail {
-  position: absolute;
-  top: 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* Table block: row/column tools appear on hover. */
+.dd-tablewrap .dd-tabletools {
   opacity: 0;
   transition: opacity 0.12s ease;
-  z-index: 25;
+  pointer-events: none;
 }
 
-.dd-block:hover .dd-rail,
-.dd-rail:hover,
-.dd-rail[data-active='true'] {
+.dd-tablewrap:hover .dd-tabletools,
+.dd-tablewrap:focus-within .dd-tabletools {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .dd-icon-btn {
@@ -177,17 +138,24 @@ html > body[data-scroll-locked] {
   color: var(--color-fd-primary-foreground);
 }
 
-/* Shiki output inside the editor's code block card. */
-.dd-codeview pre {
-  margin: 0;
-  padding: 12px 0;
-  background: transparent !important;
-  overflow-x: auto;
+/* Hover-revealed editing chips (code language, card link target): zero
+   layout footprint, paint on parent hover or own focus only. */
+.dd-langchip {
+  opacity: 0;
+  transition: opacity 0.12s ease;
 }
 
-.dd-codeview code {
-  display: block;
-  min-width: max-content;
+*:hover > .dd-langchip,
+.dd-langchip:focus {
+  opacity: 1;
+}
+
+/* Shiki output inside the editor's code block card. The viewport div carries
+   the published page's padding classes; the pre itself stays flush. */
+.dd-codeview pre {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
 }
 
 /* Reorder-drag insertion indicator. */
