@@ -336,7 +336,14 @@ export function InlineEditor() {
   const showOverride = !open && admin && slug != null && override != null && override.slug === slug;
   const liveHost = useArticleTakeover(showOverride);
 
-  if (!admin || slug == null) return null;
+  // Generated API reference pages are built from the OpenAPI schema — the
+  // source of truth is openapi/*.json, so in-site editing is disabled there.
+  const [apiPage, setApiPage] = useState(false);
+  useEffect(() => {
+    queueMicrotask(() => setApiPage(!!document.querySelector('article [data-api-page]')));
+  }, [slug]);
+
+  if (!admin || slug == null || apiPage) return null;
 
   return (
     <>

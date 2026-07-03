@@ -1,0 +1,8 @@
+{
+  "title": "Pages",
+  "description": "List and delete documentation pages.",
+  "pages": [
+    "listPages",
+    "deletePage"
+  ]
+}

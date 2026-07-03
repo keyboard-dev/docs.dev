@@ -1,0 +1,7 @@
+{
+  "title": "Publish",
+  "description": "Commit a page (and its uploaded assets) to GitHub.",
+  "pages": [
+    "publishPage"
+  ]
+}
