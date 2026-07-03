@@ -17,9 +17,13 @@
  *   </Spread>
  *
  *   <Spread image="/diagram.png" alt="Architecture" side="inline" width="50%">…</Spread>
+ *
+ * The server renders the fallback with the figure floated to its side, so
+ * pre-hydration readers already see close-to-final geometry; pretext then
+ * upgrades the same text into the true both-sides flow.
  */
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { RichFlow, type FlowObstacle } from './rich-flow';
 import { extractRuns } from './extract-runs';
 import { DraftImage } from '@/components/draft-image';
@@ -49,7 +53,7 @@ function parsePct(w: number | string | undefined): number {
   return Number.isNaN(n) ? 42 : n;
 }
 
-function Orb() {
+export function Orb() {
   return (
     <div
       aria-hidden
@@ -63,6 +67,15 @@ function Orb() {
       }}
     />
   );
+}
+
+/** Approximate the flow with CSS floats for SSR / no-JS readers. */
+function fallbackFigureStyle(side: NonNullable<SpreadProps['side']>, widthPct: number, aspect: number): CSSProperties {
+  const base: CSSProperties = { width: `${widthPct}%`, aspectRatio: `${aspect}`, margin: '6px 0 12px' };
+  if (side === 'full') return { ...base, width: '100%', margin: '6px 0 16px' };
+  if (side === 'inline') return { ...base, marginLeft: 'auto', marginRight: 'auto' };
+  if (side === 'left') return { ...base, float: 'left', marginRight: 24 };
+  return { ...base, float: 'right', marginLeft: 24 };
 }
 
 export function Spread({
@@ -93,14 +106,17 @@ export function Spread({
     );
   }
 
+  const widthPct = parsePct(width);
+  const aspect = shape === 'circle' ? 1 : 4 / 3;
+
   const obstacles: FlowObstacle[] = node
     ? [
         {
           id: 'spread-figure',
           side,
           shape,
-          widthPct: parsePct(width),
-          aspect: shape === 'circle' ? 1 : 4 / 3,
+          widthPct,
+          aspect,
           anchorTop: top,
           gap,
           node,
@@ -108,5 +124,12 @@ export function Spread({
       ]
     : [];
 
-  return <RichFlow runs={runs} obstacles={obstacles} fallback={children} />;
+  const fallback = (
+    <div style={{ display: 'flow-root' }}>
+      {node && <div style={fallbackFigureStyle(side, widthPct, aspect)}>{node}</div>}
+      {children}
+    </div>
+  );
+
+  return <RichFlow runs={runs} obstacles={obstacles} fallback={fallback} />;
 }

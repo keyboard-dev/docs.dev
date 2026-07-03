@@ -14,7 +14,11 @@ export type Block =
   | { id: string; type: 'code'; lang: string; meta: string; code: string }
   | { id: string; type: 'callout'; props: string; text: string }
   | { id: string; type: 'cards'; raw: string }
-  | { id: string; type: 'spread'; attrs: string; inner: string };
+  | { id: string; type: 'spread'; attrs: string; inner: string }
+  /** Anything the editor doesn't understand (other JSX, imports, tables).
+   *  Rendered read-only and round-tripped verbatim — the editor never
+   *  destroys what it can't represent. */
+  | { id: string; type: 'raw'; raw: string };
 
 export type ParsedDoc = { frontmatter: string; blocks: Block[] };
 
@@ -130,6 +134,46 @@ export function parseDoc(source: string): ParsedDoc {
       continue;
     }
 
+    // Unknown JSX component (e.g. <Tabs>) → protected raw block, kept verbatim.
+    const jsx = trimmed.match(/^<([A-Z][A-Za-z0-9]*)\b/);
+    if (jsx) {
+      flushProse();
+      const tag = jsx[1]!;
+      const selfClosed = /\/>\s*$/.test(trimmed);
+      const rawLines: string[] = [lines[i]!];
+      let j = i;
+      if (!selfClosed && !trimmed.includes(`</${tag}>`)) {
+        let depth = 1;
+        for (j = i + 1; j < lines.length && depth > 0; j++) {
+          const l = lines[j]!;
+          rawLines.push(l);
+          for (const m of l.matchAll(new RegExp(`<${tag}\\b[^>]*(?<!/)>|</${tag}>`, 'g'))) {
+            depth += m[0].startsWith('</') ? -1 : 1;
+          }
+        }
+        j -= 1;
+      }
+      blocks.push({ id: nid(), type: 'raw', raw: rawLines.join('\n') });
+      i = j + 1;
+      continue;
+    }
+
+    // import/export statements and Markdown tables are also protected.
+    if (/^(import|export)\s/.test(trimmed) || trimmed.startsWith('|')) {
+      flushProse();
+      const rawLines: string[] = [];
+      const isTable = trimmed.startsWith('|');
+      let j = i;
+      for (; j < lines.length; j++) {
+        const t = lines[j]!.trim();
+        if (t === '' || (isTable ? !t.startsWith('|') : !/^(import|export)\s/.test(t))) break;
+        rawLines.push(lines[j]!);
+      }
+      blocks.push({ id: nid(), type: 'raw', raw: rawLines.join('\n') });
+      i = j;
+      continue;
+    }
+
     prose.push(line);
     i++;
   }
@@ -149,6 +193,8 @@ export function serializeBlock(b: Block): string {
     case 'callout':
       return `<Callout${b.props ? ' ' + b.props : ''}>\n${b.text}\n</Callout>`;
     case 'cards':
+      return b.raw;
+    case 'raw':
       return b.raw;
     case 'spread':
       return `<Spread${b.attrs ? ' ' + b.attrs : ''}>\n\n${b.inner}\n\n</Spread>`;

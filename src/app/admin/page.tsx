@@ -25,7 +25,7 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    void loadPages();
+    void Promise.resolve().then(loadPages);
   }, [loadPages]);
 
   async function login(e: React.FormEvent) {

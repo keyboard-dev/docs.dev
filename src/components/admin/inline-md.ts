@@ -21,6 +21,8 @@ export function mdInlineToHtml(md: string): string {
   return s;
 }
 
+const BLOCKISH = new Set(['DIV', 'P', 'LI', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
+
 export function htmlToMdInline(root: Node): string {
   let out = '';
   root.childNodes.forEach((n) => {
@@ -37,9 +39,20 @@ export function htmlToMdInline(root: Node): string {
     } else if (n.nodeName === 'A') {
       const href = (n as HTMLAnchorElement).getAttribute('href') ?? '';
       out += `[${htmlToMdInline(n)}](${href})`;
+    } else if (BLOCKISH.has(n.nodeName)) {
+      // Browsers wrap Enter-created lines in block elements (Chrome: <div>).
+      // Each block child is its own line — without this the user's line
+      // breaks silently vanish on blur.
+      if (out && !out.endsWith('\n')) out += '\n';
+      const inner = htmlToMdInline(n);
+      // An empty block (Chrome renders it as <div><br></div>) is an
+      // intentionally blank line.
+      out += inner === '' ? '\n' : inner;
+      if (!out.endsWith('\n')) out += '\n';
     } else {
       out += htmlToMdInline(n);
     }
   });
-  return out;
+  // A single trailing newline is an artifact of block-wrapping, not content.
+  return out.replace(/\n$/, '');
 }

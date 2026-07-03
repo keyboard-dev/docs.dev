@@ -121,8 +121,7 @@ export function PageFlow({
   useEffect(() => {
     let cancelled = false;
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
-    if (fonts?.ready) fonts.ready.then(() => !cancelled && setFontsReady(true));
-    else setFontsReady(true);
+    (fonts?.ready ?? Promise.resolve()).then(() => !cancelled && setFontsReady(true));
     return () => {
       cancelled = true;
     };

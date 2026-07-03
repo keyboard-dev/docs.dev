@@ -13,6 +13,9 @@ export function usePageDraft(slug: string) {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [status, setStatus] = useState('');
   const [publishing, setPublishing] = useState(false);
+  /** Bumped whenever `source` is replaced wholesale (load/discard) so the
+   *  editor remounts with fresh state instead of keeping stale blocks. */
+  const [revision, setRevision] = useState(0);
   const draftRef = useRef('');
 
   const load = useCallback(async () => {
@@ -25,11 +28,12 @@ export function usePageDraft(slug: string) {
     const initial = draft?.content ?? baseline;
     draftRef.current = initial;
     setSource(initial);
+    setRevision((r) => r + 1);
     setStatus(draft && draft.content !== baseline ? 'Draft · saved locally' : '');
   }, [slug]);
 
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(load);
   }, [load]);
 
   const onChange = useCallback(
@@ -52,6 +56,7 @@ export function usePageDraft(slug: string) {
     await deleteInlineEdits(slug);
     draftRef.current = published;
     setSource(published);
+    setRevision((r) => r + 1);
     setStatus('');
   }, [published, slug]);
 
@@ -76,7 +81,7 @@ export function usePageDraft(slug: string) {
       await deleteDraft(slug);
       await deleteInlineEdits(slug);
       setPublished(draftRef.current);
-      setStatus('Published — the live page rebuilds shortly.');
+      setStatus('Published ✓ — the live page rebuilds in a minute or two.');
     } catch (e) {
       setStatus((e as Error).message);
     } finally {
@@ -84,5 +89,5 @@ export function usePageDraft(slug: string) {
     }
   }, [slug]);
 
-  return { source, authed, status, publishing, onChange, discard, publish };
+  return { source, revision, authed, status, publishing, onChange, discard, publish, getCurrent: () => draftRef.current };
 }

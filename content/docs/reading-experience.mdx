@@ -7,6 +7,12 @@ This is an ordinary documentation page. The heading above, this paragraph, the
 code block below — all standard Fumadocs, exactly what you would write in any
 other docs tool. The difference shows up when you reach for `<Spread>`.
 
+```mdx
+<Spread orb side="right" width="42%">
+  Prose that flows around the figure, with **bold**, `code`, and [links](/) intact.
+</Spread>
+```
+
 ## Flowing prose
 
 Wrap any Markdown in `<Spread>` and the prose flows around a figure, like a
@@ -22,6 +28,23 @@ That last part is something CSS Shapes cannot do: it only ever wraps on a single
 side. Here the column genuinely narrows as it passes the orb and widens again
 below it, and the words you are reading remain ordinary text nodes that a
 crawler can index and a screen reader can announce.
+</Spread>
+
+## Text on both sides at once
+
+Drop the figure in the middle of the column and the prose splits around it —
+each line measured and placed on the left *and* the right of the figure. This
+is the layout CSS floats and CSS Shapes fundamentally cannot express, and it
+falls back to a clean stacked layout on small screens:
+
+<Spread orb side="inline" width="34%" top={10}>
+With `side="inline"` the figure sits centered while the paragraph continues
+around **both** of its edges, like a proper magazine spread. Resize the window
+and watch every line re-measure and re-break in real time — the geometry is
+recomputed against the live column width, so the arrangement you design is the
+arrangement readers get on any screen. On phones the figure gracefully goes
+full-width and the prose stacks below it, because a two-sided flow at narrow
+widths would leave slivers of unreadable text.
 </Spread>
 
 ## How it stays fast and accessible
