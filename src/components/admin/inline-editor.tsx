@@ -90,11 +90,12 @@ function PreviewInPlace({ source }: { source: string }) {
         // Subpath imports keep node-only plugins (remark-image → node:fs)
         // out of the client bundle. remark-npm turns package-install fences
         // into the npm/pnpm/yarn/bun tabs, exactly like the build.
-        const [{ evaluate }, { rehypeCode }, { remarkGfm }, { remarkNpm }] = await Promise.all([
+        const [{ evaluate }, { rehypeCode }, { remarkGfm }, { remarkNpm }, { remarkCodeTab }] = await Promise.all([
           import('@mdx-js/mdx'),
           import('fumadocs-core/mdx-plugins/rehype-code'),
           import('fumadocs-core/mdx-plugins/remark-gfm'),
           import('fumadocs-core/mdx-plugins/remark-npm'),
+          import('fumadocs-core/mdx-plugins/remark-code-tab'),
         ]);
         if (cancelled) return;
         setContent(null);
@@ -104,7 +105,7 @@ function PreviewInPlace({ source }: { source: string }) {
           jsx: runtime.jsx,
           jsxs: runtime.jsxs,
           baseUrl: window.location.href,
-          remarkPlugins: [remarkGfm, remarkNpm],
+          remarkPlugins: [remarkGfm, remarkNpm, remarkCodeTab],
           rehypePlugins: [[rehypeCode, { lazy: true, fallbackLanguage: 'txt' }]],
         });
         if (!cancelled) setContent(() => mod.default as ComponentType<{ components?: unknown }>);

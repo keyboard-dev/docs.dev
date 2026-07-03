@@ -23,6 +23,9 @@ export type Block =
   | { id: string; type: 'image'; src: string; alt: string }
   | { id: string; type: 'table'; header: string[]; align: string[]; rows: string[][] }
   | { id: string; type: 'hr' }
+  /** <Tabs items={[…]}> containing only tab-labelled code fences (the shape
+   *  docs.dev produces). Anything richer stays a protected raw block. */
+  | { id: string; type: 'tabs'; tabs: Array<{ label: string; lang: string; meta: string; code: string }> }
   /** Anything the editor doesn't understand (other JSX, imports, nested
    *  lists). Rendered read-only and round-tripped verbatim. */
   | { id: string; type: 'raw'; raw: string };
@@ -72,6 +75,41 @@ function parseTableRow(line: string): string[] {
 }
 
 const TABLE_SEP_CELL = /^:?-{3,}:?$/;
+
+/** Structured parse of a <Tabs> body: only blank lines and code fences with
+ *  a tab="Label" meta are allowed. Returns null when the content is richer
+ *  than code tabs (falls back to a protected raw block). */
+function parseCodeTabs(lines: string[]): Array<{ label: string; lang: string; meta: string; code: string }> | null {
+  const tabs: Array<{ label: string; lang: string; meta: string; code: string }> = [];
+  // Body excludes the opening <Tabs …> line and the closing </Tabs> line.
+  let i = 1;
+  const last = lines.length - 1;
+  if (!lines[last]!.trim().startsWith('</Tabs>')) return null;
+  while (i < last) {
+    const t = lines[i]!.trim();
+    if (t === '') {
+      i++;
+      continue;
+    }
+    const fence = t.match(FENCE);
+    if (!fence) return null;
+    const info = fence[2]!.trim();
+    const label = (info.match(/tab="([^"]*)"/) ?? [])[1];
+    if (label == null) return null;
+    const lang = info.split(/\s+/)[0] ?? '';
+    const meta = info.slice(lang.length).replace(/\s*tab="[^"]*"/, '').trim();
+    const code: string[] = [];
+    i++;
+    while (i < last && !lines[i]!.trim().match(FENCE)) {
+      code.push(lines[i]!);
+      i++;
+    }
+    if (i >= last) return null; // unterminated fence
+    i++; // closing fence
+    tabs.push({ label, lang, meta, code: code.join('\n') });
+  }
+  return tabs.length > 0 ? tabs : null;
+}
 
 export function parseDoc(source: string): ParsedDoc {
   let body = source;
@@ -250,7 +288,30 @@ export function parseDoc(source: string): ParsedDoc {
       continue;
     }
 
-    // Unknown JSX component (e.g. <Tabs>) → protected raw block, kept verbatim.
+    // <Tabs> of code fences → structured, editable tabs block.
+    if (/^<Tabs\b/.test(trimmed)) {
+      flushProse();
+      const rawLines: string[] = [lines[i]!];
+      let j = i;
+      if (!trimmed.includes('</Tabs>')) {
+        let depth = 1;
+        for (j = i + 1; j < lines.length && depth > 0; j++) {
+          const l = lines[j]!;
+          rawLines.push(l);
+          for (const m of l.matchAll(/<Tabs\b[^>]*(?<!\/)>|<\/Tabs>/g)) {
+            depth += m[0].startsWith('</') ? -1 : 1;
+          }
+        }
+        j -= 1;
+      }
+      const tabs = parseCodeTabs(rawLines);
+      if (tabs) blocks.push({ id: nid(), type: 'tabs', tabs });
+      else blocks.push({ id: nid(), type: 'raw', raw: rawLines.join('\n') });
+      i = j + 1;
+      continue;
+    }
+
+    // Unknown JSX component → protected raw block, kept verbatim.
     const jsx = trimmed.match(/^<([A-Z][A-Za-z0-9]*)\b/);
     if (jsx) {
       flushProse();
@@ -336,6 +397,13 @@ export function serializeBlock(b: Block): string {
       return serializeTable(b);
     case 'hr':
       return '---';
+    case 'tabs': {
+      const items = b.tabs.map((t) => `'${t.label.replace(/'/g, '’')}'`).join(', ');
+      const fences = b.tabs.map(
+        (t) => '```' + [t.lang, t.meta, `tab="${t.label}"`].filter(Boolean).join(' ') + '\n' + t.code + '\n```',
+      );
+      return `<Tabs items={[${items}]}>\n\n${fences.join('\n\n')}\n\n</Tabs>`;
+    }
     case 'raw':
       return b.raw;
     case 'spread':

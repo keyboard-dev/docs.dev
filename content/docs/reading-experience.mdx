@@ -37,7 +37,7 @@ each line measured and placed on the left *and* the right of the figure. This
 is the layout CSS floats and CSS Shapes fundamentally cannot express, and it
 falls back to a clean stacked layout on small screens:
 
-<Spread orb side="inline" width="34%" top={10}>
+<Spread orb side="inline" width="34%" top={10} caption="The flow re-measures against the live column width — the caption reserves real space too.">
 With `side="inline"` the figure sits centered while the paragraph continues
 around **both** of its edges, like a proper magazine spread. Resize the window
 and watch every line re-measure and re-break in real time — the geometry is

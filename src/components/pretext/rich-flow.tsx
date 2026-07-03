@@ -61,12 +61,40 @@ export type FlowObstacle = {
   anchorTop?: number;
   gap?: number;
   node: ReactNode;
+  /** Caption under the figure. `text` is measured (canvas arithmetic, like
+   *  everything else) so the flow reserves the right space; `node` optionally
+   *  overrides the rendered element (the editor passes an editable one). */
+  caption?: { text: string; node?: ReactNode };
 };
+
+const CAPTION_SIZE = 12.5;
+const CAPTION_LINE = 17;
+const CAPTION_GAP = 8;
+
+let measureCtx: CanvasRenderingContext2D | null = null;
+function captionHeight(text: string, family: string, width: number): number {
+  if (!text) return CAPTION_LINE + CAPTION_GAP; // empty editable placeholder row
+  measureCtx ??= document.createElement('canvas').getContext('2d');
+  if (!measureCtx) return CAPTION_LINE + CAPTION_GAP;
+  measureCtx.font = `${CAPTION_SIZE}px ${family}`;
+  const lines = Math.max(1, Math.ceil(measureCtx.measureText(text).width / Math.max(60, width)));
+  return lines * CAPTION_LINE + CAPTION_GAP;
+}
 
 // Below this column width the figure goes full-width and prose stacks.
 const NARROW_WIDTH = 560;
 
-type PlacedObstacle = { id: string; node: ReactNode; x: number; top: number; w: number; h: number };
+type PlacedObstacle = {
+  id: string;
+  node: ReactNode;
+  x: number;
+  top: number;
+  w: number;
+  /** Figure height (excluding caption). */
+  h: number;
+  capH: number;
+  caption?: { text: string; node?: ReactNode };
+};
 
 export type RichFlowProps = {
   runs: Run[];
@@ -199,19 +227,22 @@ export function RichFlow({
         const w = full ? containerWidth : Math.round((o.widthPct / 100) * containerWidth);
         const aspect = o.aspect ?? (o.shape === 'circle' ? 1 : 4 / 3);
         const h = Math.round(w / aspect);
+        const capH = o.caption ? captionHeight(o.caption.text, resolved.family, w) : 0;
         const top = full ? (o.anchorTop != null && !narrow ? o.anchorTop : 0) : o.anchorTop ?? 6;
         const x = full ? 0 : o.side === 'left' ? 0 : o.side === 'inline' ? Math.round((containerWidth - w) / 2) : containerWidth - w;
-        placedObs.push({ id: o.id, node: o.node, x, top, w, h });
+        placedObs.push({ id: o.id, node: o.node, x, top, w, h, capH, caption: o.caption });
 
         if (full) {
           // Spans the whole column → no slot in this band → text stacks below.
-          rects.push({ x: 0, y: top, w: containerWidth, h });
+          rects.push({ x: 0, y: top, w: containerWidth, h: h + capH });
         } else if (o.shape === 'circle') {
           circles.push({ cx: x + w / 2, cy: top + h / 2, r: w / 2, hPad: gap, vPad: gap / 2 });
+          // The caption band below the circle is rectangular.
+          if (capH > 0) rects.push({ x: x - gap, y: top + h, w: w + gap * 2, h: capH + gap / 2 });
         } else if (o.side === 'inline') {
-          rects.push({ x: x - gap, y: top, w: w + gap * 2, h });
+          rects.push({ x: x - gap, y: top, w: w + gap * 2, h: h + capH });
         } else {
-          rects.push({ x: x === 0 ? 0 : x - gap, y: top, w: w + gap, h });
+          rects.push({ x: x === 0 ? 0 : x - gap, y: top, w: w + gap, h: h + capH });
         }
       }
 
@@ -264,7 +295,7 @@ export function RichFlow({
       }
 
       let bottom = y;
-      for (const o of placedObs) bottom = Math.max(bottom, o.top + o.h);
+      for (const o of placedObs) bottom = Math.max(bottom, o.top + o.h + o.capH);
 
       setLines(nextLines);
       setPlacedObstacles(placedObs);
@@ -323,9 +354,23 @@ export function RichFlow({
           {placedObstacles.map((o) => (
             <div
               key={o.id}
-              style={{ position: 'absolute', left: o.x, top: o.top, width: o.w, height: o.h }}
+              style={{ position: 'absolute', left: o.x, top: o.top, width: o.w, height: o.h + o.capH }}
             >
-              {o.node}
+              <div style={{ height: o.h }}>{o.node}</div>
+              {o.caption &&
+                (o.caption.node ?? (
+                  <figcaption
+                    style={{
+                      marginTop: CAPTION_GAP,
+                      fontSize: CAPTION_SIZE,
+                      lineHeight: `${CAPTION_LINE}px`,
+                      textAlign: 'center',
+                      color: 'var(--color-fd-muted-foreground, #888)',
+                    }}
+                  >
+                    {o.caption.text}
+                  </figcaption>
+                ))}
             </div>
           ))}
 

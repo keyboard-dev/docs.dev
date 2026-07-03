@@ -61,7 +61,7 @@ import {
   X,
 } from 'lucide-react';
 import { Callout } from 'fumadocs-ui/components/callout';
-import { Pre } from 'fumadocs-ui/components/codeblock';
+import { CodeBlockTab, CodeBlockTabs, CodeBlockTabsList, CodeBlockTabsTrigger, Pre } from 'fumadocs-ui/components/codeblock';
 import { useShiki } from 'fumadocs-core/highlight/client';
 import { parseDoc, serializeDoc, type Block } from './mdx-blocks';
 import { mdInlineToHtml, htmlToMdInline } from './inline-md';
@@ -184,6 +184,24 @@ function readDataUrl(file: File): Promise<string> {
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const uploadPathFor = (file: File) => `/uploads/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
 
+/** GitHub-style anchor slug, matching what the published headings get. */
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[*_`~[\]()]/g, '')
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
+    .replace(/\s+/g, '-');
+}
+
+/** Plain text of an inline-markdown string (marks stripped). */
+function mdPlainText(md: string): string {
+  return md
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*`]/g, '')
+    .trim();
+}
+
 /* ------------------------------------------------------------------ */
 /* editable field                                                      */
 /* ------------------------------------------------------------------ */
@@ -193,6 +211,8 @@ type FieldOpts = {
   style?: CSSProperties;
   className?: string;
   index?: number;
+  /** DOM id (heading anchors, so TOC links scroll to the right place). */
+  htmlId?: string;
   onKeyDown?: (e: React.KeyboardEvent<HTMLElement>) => void;
 };
 
@@ -214,6 +234,7 @@ function editableField(
     'data-block-id': id,
     'data-rich-field': '1',
     'data-placeholder': opts?.placeholder ?? '',
+    ...(opts?.htmlId ? { id: opts.htmlId } : null),
     ...(opts?.index != null ? { 'data-block-index': opts.index } : null),
     onInput: (e: React.FormEvent<HTMLElement>) => onLiveMd(htmlToMdInline(e.currentTarget)),
     onKeyDown: opts?.onKeyDown,
@@ -246,6 +267,68 @@ function PlainCode({ code }: { code: string }) {
   );
 }
 
+/** The idle-highlighted / click-to-edit code surface, shared by standalone
+ *  code blocks and code tabs. Carries the published viewport classes. */
+function CodeEditArea({
+  code,
+  lang,
+  onLive,
+  onCommit,
+}: {
+  code: string;
+  lang: string;
+  onLive: (code: string) => void;
+  onCommit: (code: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return (
+      <pre
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck={false}
+        ref={(el) => {
+          if (el && document.activeElement !== el) {
+            el.focus();
+            placeCaret(el, 'end');
+          }
+        }}
+        onInput={(e) => onLive(e.currentTarget.textContent ?? '')}
+        onKeyDown={(e) => {
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            document.execCommand('insertText', false, '  ');
+          }
+        }}
+        onBlur={(e) => {
+          onCommit(e.currentTarget.textContent ?? '');
+          setEditing(false);
+        }}
+        className="text-[0.8125rem] py-3.5 px-4"
+        style={{
+          margin: 0, outline: 'none',
+          fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)', lineHeight: 1.4286,
+          whiteSpace: 'pre', overflowX: 'auto', color: 'var(--color-fd-foreground)',
+        }}
+      >
+        {code}
+      </pre>
+    );
+  }
+  return (
+    <div
+      onClick={() => setEditing(true)}
+      title="Click to edit code"
+      className="dd-codeview text-[0.8125rem] py-3.5 overflow-auto max-h-[600px]"
+      style={{ cursor: 'text' }}
+    >
+      <Suspense fallback={<PlainCode code={code} />}>
+        <HighlightedCode code={code} lang={lang} />
+      </Suspense>
+    </div>
+  );
+}
+
 type CodeBlockT = Extract<Block, { type: 'code' }>;
 
 function EditorCode({
@@ -261,7 +344,6 @@ function EditorCode({
   onLive: (code: string) => void;
   onCommit: (code: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
   // Match the published CodeBlock: a header row exists only when the fence
   // has a title; the language is an on-hover chip so the geometry is
   // identical to the real page.
@@ -269,7 +351,7 @@ function EditorCode({
   return (
     <figure
       data-block-index={index}
-      className="dd-codefig my-4 bg-fd-card rounded-xl shiki relative border shadow-sm not-prose overflow-hidden text-sm"
+      className="my-4 bg-fd-card rounded-xl shiki relative border shadow-sm not-prose overflow-hidden text-sm"
     >
       <input
         value={b.lang}
@@ -292,50 +374,108 @@ function EditorCode({
           <figcaption className="flex-1 truncate">{title}</figcaption>
         </div>
       )}
-      {editing ? (
-        <pre
-          contentEditable
-          suppressContentEditableWarning
-          spellCheck={false}
-          ref={(el) => {
-            if (el && document.activeElement !== el) {
-              el.focus();
-              placeCaret(el, 'end');
-            }
-          }}
-          onInput={(e) => onLive(e.currentTarget.textContent ?? '')}
-          onKeyDown={(e) => {
-            if (e.key === 'Tab') {
-              e.preventDefault();
-              document.execCommand('insertText', false, '  ');
-            }
-          }}
-          onBlur={(e) => {
-            onCommit(e.currentTarget.textContent ?? '');
-            setEditing(false);
-          }}
-          className="text-[0.8125rem] py-3.5 px-4"
-          style={{
-            margin: 0, outline: 'none',
-            fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)', lineHeight: 1.4286,
-            whiteSpace: 'pre', overflowX: 'auto', color: 'var(--color-fd-foreground)',
-          }}
-        >
-          {b.code}
-        </pre>
-      ) : (
-        <div
-          onClick={() => setEditing(true)}
-          title="Click to edit code"
-          className="dd-codeview text-[0.8125rem] py-3.5 overflow-auto max-h-[600px]"
-          style={{ cursor: 'text' }}
-        >
-          <Suspense fallback={<PlainCode code={b.code} />}>
-            <HighlightedCode code={b.code} lang={b.lang} />
-          </Suspense>
-        </div>
-      )}
+      <CodeEditArea code={b.code} lang={b.lang} onLive={onLive} onCommit={onCommit} />
     </figure>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* code tabs — the real CodeBlockTabs, editable                        */
+/* ------------------------------------------------------------------ */
+
+type TabsBlockT = Extract<Block, { type: 'tabs' }>;
+
+function EditorTabs({
+  b,
+  index,
+  onCommit,
+}: {
+  b: TabsBlockT;
+  index: number;
+  onCommit: (tabs: TabsBlockT['tabs'], opts?: { structural?: boolean }) => void;
+}) {
+  const [sel, setSel] = useState(b.tabs[0]?.label ?? '');
+  const active = b.tabs.some((t) => t.label === sel) ? sel : b.tabs[0]?.label ?? '';
+
+  const uniqueLabel = (base: string) => {
+    let label = base;
+    let n = 2;
+    while (b.tabs.some((t) => t.label === label)) label = `${base} ${n++}`;
+    return label;
+  };
+  const tools: Array<[string, () => void]> = [
+    ['+ Tab', () => {
+      const label = uniqueLabel('New tab');
+      onCommit([...b.tabs, { label, lang: 'ts', meta: '', code: '' }], { structural: true });
+      setSel(label);
+    }],
+    ['Rename', () => {
+      const next = window.prompt('Tab label', active)?.trim();
+      if (!next || next === active) return;
+      const label = uniqueLabel(next);
+      onCommit(b.tabs.map((t) => (t.label === active ? { ...t, label } : t)), { structural: true });
+      setSel(label);
+    }],
+    ['− Tab', () => {
+      if (b.tabs.length <= 1) return;
+      const rest = b.tabs.filter((t) => t.label !== active);
+      onCommit(rest, { structural: true });
+      setSel(rest[0]!.label);
+    }],
+  ];
+
+  return (
+    <CodeBlockTabs
+      data-block-index={index}
+      className="dd-tablewrap"
+      value={active}
+      onValueChange={setSel}
+      style={{ position: 'relative', overflow: 'visible' }}
+    >
+      <div className="dd-tabletools dd-pop" style={{ position: 'absolute', top: -34, right: 0, display: 'flex', gap: 2, padding: 3, zIndex: 40 }}>
+        {tools.map(([label, fn]) => (
+          <button key={label} className="dd-chip-btn" style={{ height: 22 }} onClick={(e) => { e.stopPropagation(); fn(); }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <CodeBlockTabsList>
+        {b.tabs.map((t) => (
+          <CodeBlockTabsTrigger key={t.label} value={t.label}>
+            {t.label}
+          </CodeBlockTabsTrigger>
+        ))}
+      </CodeBlockTabsList>
+      {b.tabs.map((t, ti) => (
+        <CodeBlockTab key={t.label} value={t.label}>
+          {/* Same classes as the published nested CodeBlock (inTab variant). */}
+          <figure className="bg-fd-secondary -mx-px -mb-px rounded-b-xl shiki relative border shadow-sm not-prose overflow-hidden text-sm" style={{ position: 'relative' }}>
+            <input
+              value={t.lang}
+              onChange={(e) => onCommit(b.tabs.map((x, j) => (j === ti ? { ...x, lang: e.target.value } : x)))}
+              onClick={(e) => e.stopPropagation()}
+              spellCheck={false}
+              aria-label="Language"
+              placeholder="lang"
+              className="dd-langchip"
+              style={{
+                position: 'absolute', top: 6, right: 8, zIndex: 5, width: 96, height: 22,
+                border: '1px solid var(--color-fd-border)', borderRadius: 6, outline: 'none',
+                background: 'var(--color-fd-popover)', padding: '0 8px', textAlign: 'right',
+                fontFamily: 'ui-monospace, monospace', fontSize: 10.5, letterSpacing: '0.08em',
+                textTransform: 'uppercase', color: 'var(--color-fd-muted-foreground)',
+              }}
+            />
+            <CodeEditArea
+              code={t.code}
+              lang={t.lang}
+              onLive={() => {}}
+              onCommit={(code) => onCommit(b.tabs.map((x, j) => (j === ti ? { ...x, code } : x)))}
+            />
+          </figure>
+        </CodeBlockTab>
+      ))}
+    </CodeBlockTabs>
   );
 }
 
@@ -501,18 +641,46 @@ function EditorSpread({
     </div>
   );
 
+  const captionText = a.caption ?? '';
+  const captionStyle: CSSProperties = {
+    marginTop: 8,
+    fontSize: 12.5,
+    lineHeight: '17px',
+    textAlign: 'center',
+    color: 'var(--color-fd-muted-foreground)',
+  };
+  const editableCaption = (
+    <figcaption
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck={false}
+      data-fig-ui
+      className="dd-field"
+      data-placeholder="Add a caption…"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onBlur={(e) => onCommitAttrs({ ...committed, caption: (e.currentTarget.textContent ?? '').trim() || undefined })}
+      style={captionStyle}
+    >
+      {captionText}
+    </figcaption>
+  );
+
   if (textEditing) {
     // Focused: a float approximation so the caret behaves like normal text;
     // blur returns to the true pretext flow.
     const figStyle: CSSProperties =
       side === 'full'
-        ? { width: '100%', aspectRatio: a.orb ? '1' : '4 / 3', margin: '6px 0 16px' }
+        ? { width: '100%', margin: '6px 0 16px' }
         : side === 'inline'
-          ? { width: `${widthPct}%`, aspectRatio: a.orb ? '1' : '4 / 3', margin: '6px auto 14px', float: 'none' }
-          : { width: `${widthPct}%`, aspectRatio: a.orb ? '1' : '4 / 3', float: side, margin: side === 'left' ? '6px 24px 12px 0' : '6px 0 12px 24px' };
+          ? { width: `${widthPct}%`, margin: '6px auto 14px', float: 'none' }
+          : { width: `${widthPct}%`, float: side, margin: side === 'left' ? '6px 24px 12px 0' : '6px 0 12px 24px' };
     return (
       <div data-block-index={index} style={{ display: 'flow-root' }}>
-        <div style={figStyle}>{visual}</div>
+        <div style={figStyle}>
+          <div style={{ aspectRatio: a.orb ? '1' : '4 / 3' }}>{visual}</div>
+          {(captionText || selected) && editableCaption}
+        </div>
         <p
           contentEditable
           suppressContentEditableWarning
@@ -549,6 +717,7 @@ function EditorSpread({
       anchorTop: top,
       gap: a.gap ?? 28,
       node: figureNode,
+      caption: captionText || selected ? { text: captionText, node: editableCaption } : undefined,
     },
   ];
 
@@ -802,6 +971,7 @@ const PALETTE: Array<{ type: string; label: string; icon: ReactNode }> = [
   { type: 'olist', label: 'Numbered list', icon: <ListOrdered size={15} /> },
   { type: 'quote', label: 'Quote', icon: <QuoteIcon size={15} /> },
   { type: 'code', label: 'Code block', icon: <Code size={15} /> },
+  { type: 'tabs', label: 'Code tabs', icon: <Code size={15} /> },
   { type: 'callout', label: 'Callout', icon: <Info size={15} /> },
   { type: 'cards', label: 'Cards', icon: <LayoutGrid size={15} /> },
   { type: 'image', label: 'Image', icon: <ImagePlus size={15} /> },
@@ -955,6 +1125,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       case 'heading': return { id, type: 'heading', depth: 2, text: 'New section' };
       case 'callout': return { id, type: 'callout', props: 'type="info"', text: 'Something worth pulling out of the flow.' };
       case 'code': return { id, type: 'code', lang: 'ts', meta: '', code: 'const x = 1;' };
+      case 'tabs': return { id, type: 'tabs', tabs: [{ label: 'Tab 1', lang: 'ts', meta: '', code: 'const x = 1;' }, { label: 'Tab 2', lang: 'js', meta: '', code: 'const x = 1;' }] };
       case 'cards': return { id, type: 'cards', raw: '<Cards>\n  <Card title="Title" href="/" />\n</Cards>' };
       case 'spread': return { id, type: 'spread', attrs: 'orb side="right" width="42%"', inner: 'Describe this figure — the prose here flows around it, laid out live by pretext.' };
       case 'list': return { id, type: 'list', ordered: false, items: ['First item'] };
@@ -1035,6 +1206,63 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     el.focus();
     placeCaret(el, req.at);
   });
+
+  /* ---------------- live table of contents ---------------- */
+
+  // The "On this page" rail tracks the doc as you edit. The theme's own item
+  // list is React-owned (with resize observers over its anchors), so we never
+  // mutate it — we hide it (its zero-height guard idles the observers) and
+  // render our own sibling list, template-cloned from the theme's markup so
+  // the styling survives. Retitled live while you type.
+  const tocRef = useRef<{ original: HTMLElement; mine: HTMLElement; template: HTMLAnchorElement } | null>(null);
+  useEffect(() => {
+    try {
+      if (!tocRef.current) {
+        const first = document.querySelector<HTMLAnchorElement>('#nd-toc a[href^="#"]');
+        const original = first?.parentElement;
+        if (!first || !original || !original.parentElement) return;
+        const mine = document.createElement('div');
+        mine.className = original.className;
+        original.parentElement.insertBefore(mine, original.nextSibling);
+        original.style.display = 'none';
+        tocRef.current = { original, mine, template: first.cloneNode(true) as HTMLAnchorElement };
+      }
+      const { mine, template } = tocRef.current;
+      const frag = document.createDocumentFragment();
+      for (const h of blocks.filter((x): x is Extract<Block, { type: 'heading' }> => x.type === 'heading')) {
+        const aEl = template.cloneNode(true) as HTMLAnchorElement;
+        const plain = mdPlainText(h.text);
+        aEl.setAttribute('href', '#' + slugify(plain));
+        aEl.setAttribute('data-dd-heading', h.id);
+        aEl.removeAttribute('data-active');
+        const svg = aEl.querySelector('svg');
+        aEl.textContent = '';
+        if (svg) aEl.appendChild(svg);
+        aEl.appendChild(document.createTextNode(plain));
+        frag.appendChild(aEl);
+      }
+      mine.replaceChildren(frag);
+    } catch {
+      // TOC markup is theme-specific; live updates are best-effort.
+    }
+  }, [blocks]);
+  // Restore the built page's TOC when the editor closes.
+  useEffect(
+    () => () => {
+      const t = tocRef.current;
+      if (t) {
+        t.mine.remove();
+        t.original.style.display = '';
+      }
+    },
+    [],
+  );
+
+  const patchTocTitle = (id: string, md: string) => {
+    const aEl = document.querySelector(`#nd-toc a[data-dd-heading="${id}"]`);
+    const last = aEl?.lastChild;
+    if (last && last.nodeType === Node.TEXT_NODE) last.textContent = mdPlainText(md);
+  };
 
   const proseKeys = (b: Extract<Block, { type: 'prose' | 'heading' }>) => (e: React.KeyboardEvent<HTMLElement>) => {
     const el = e.currentTarget;
@@ -1164,11 +1392,22 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
   function renderBlock(b: Block, i: number) {
     switch (b.type) {
       case 'heading':
-        return field(`h${Math.min(6, Math.max(1, b.depth))}`, b.id, mdInlineToHtml(b.text), (md) => update(b.id, { text: md }), {
-          placeholder: 'Heading',
-          index: i,
-          onKeyDown: proseKeys(b),
-        });
+        return editableField(
+          `h${Math.min(6, Math.max(1, b.depth))}`,
+          b.id,
+          mdInlineToHtml(b.text),
+          (md) => {
+            setLiveText(b.id, md);
+            patchTocTitle(b.id, md);
+          },
+          (md) => update(b.id, { text: md }),
+          {
+            placeholder: 'Heading',
+            index: i,
+            htmlId: slugify(mdPlainText(b.text)),
+            onKeyDown: proseKeys(b),
+          },
+        );
       case 'prose':
         return field('p', b.id, mdInlineToHtml(b.text), (md) => update(b.id, { text: md }), {
           placeholder: 'Type something…',
@@ -1273,6 +1512,8 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
         );
       case 'table':
         return <EditorTable key={b.id} b={b} index={i} onCommit={(patch) => update(b.id, patch)} />;
+      case 'tabs':
+        return <EditorTabs key={b.id} b={b} index={i} onCommit={(tabs, opts) => update(b.id, { tabs }, opts)} />;
       case 'hr':
         return <hr key={b.id} data-block-index={i} />;
       case 'spread':

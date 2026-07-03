@@ -37,6 +37,8 @@ export type SpreadProps = {
   alt?: string;
   /** Convenience: render a built-in glowing orb as the figure. */
   orb?: boolean;
+  /** Caption rendered under the figure; the flow reserves space for it. */
+  caption?: string;
   /** Left / Right float, Inline (centered, text both sides), or Full width. */
   side?: 'left' | 'right' | 'inline' | 'full';
   /** Figure width as a percentage of the column (e.g. "42%" or 42). */
@@ -84,6 +86,7 @@ export function Spread({
   image,
   alt = '',
   orb = false,
+  caption,
   side = 'right',
   width,
   top = 6,
@@ -120,13 +123,23 @@ export function Spread({
           anchorTop: top,
           gap,
           node,
+          caption: caption ? { text: caption } : undefined,
         },
       ]
     : [];
 
   const fallback = (
     <div style={{ display: 'flow-root' }}>
-      {node && <div style={fallbackFigureStyle(side, widthPct, aspect)}>{node}</div>}
+      {node && (
+        <figure style={{ ...fallbackFigureStyle(side, widthPct, aspect), aspectRatio: undefined }}>
+          <div style={{ aspectRatio: `${aspect}` }}>{node}</div>
+          {caption && (
+            <figcaption style={{ marginTop: 8, fontSize: 12.5, lineHeight: '17px', textAlign: 'center', color: 'var(--color-fd-muted-foreground, #888)' }}>
+              {caption}
+            </figcaption>
+          )}
+        </figure>
+      )}
       {children}
     </div>
   );
