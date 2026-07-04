@@ -13,7 +13,7 @@ const ACCENT = 'var(--docsdev-accent, #c2571f)';
 export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [sso, setSso] = useState(false);
-  const [defaultPin, setDefaultPin] = useState(false);
+  const [pinConfigured, setPinConfigured] = useState(true); // assume true until checked, to avoid a flash
   const [pin, setPin] = useState('');
   const [pages, setPages] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -30,9 +30,9 @@ export default function AdminPage() {
     void loadPages();
     void fetch('/api/admin/session')
       .then((r) => r.json())
-      .then((d: { sso?: boolean; defaultPin?: boolean }) => {
+      .then((d: { sso?: boolean; pinConfigured?: boolean }) => {
         setSso(Boolean(d.sso));
-        setDefaultPin(Boolean(d.defaultPin));
+        setPinConfigured(d.pinConfigured !== false);
       })
       .catch(() => {});
   }, [loadPages]);
@@ -48,6 +48,8 @@ export default function AdminPage() {
       setPin('');
       setError('');
       void loadPages();
+    } else if (res.status === 503) {
+      setError('Standalone login is not configured on this deployment yet.');
     } else {
       setError('Invalid PIN.');
     }
@@ -60,11 +62,11 @@ export default function AdminPage() {
 
   const shell: React.CSSProperties = { maxWidth: 720, margin: '0 auto', padding: '56px 24px', fontFamily: 'ui-sans-serif, system-ui, sans-serif', color: '#1c1a16' };
   const field: React.CSSProperties = { padding: '10px 14px', borderRadius: 10, border: '1px solid #ccc', fontSize: 16 };
-  const warningBanner = defaultPin && (
+  const notConfiguredNotice = !sso && !pinConfigured && (
     <p style={{ background: '#fdf0e6', border: '1px solid #f0c9a0', color: '#8a4a12', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 20 }}>
-      ⚠️ This site is using the default PIN (<code>1234</code>), which anyone can find in the
-      public docs.dev template. Set an <code>ADMIN_PIN</code> secret, or switch to team sign-in
-      with <code>DOCSDEV_SITE_ID</code>.
+      ⚠️ No login is configured for this deployment yet. Set the <code>ADMIN_PIN</code> and{' '}
+      <code>ADMIN_SECRET</code> wrangler secrets to use a PIN, or set{' '}
+      <code>DOCSDEV_SITE_ID</code> to sign in with your docs.dev team.
     </p>
   );
 
@@ -74,13 +76,13 @@ export default function AdminPage() {
     return (
       <main style={shell}>
         <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>docs.dev admin</h1>
-        {warningBanner}
+        {notConfiguredNotice}
         {sso ? (
           <>
             <p style={{ color: '#8a857a', marginBottom: 24 }}>Sign in with your docs.dev team account to edit content.</p>
             <a href="/api/admin/sso/start" style={{ ...field, display: 'inline-block', border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, textDecoration: 'none' }}>Sign in with docs.dev</a>
           </>
-        ) : (
+        ) : pinConfigured ? (
           <>
             <p style={{ color: '#8a857a', marginBottom: 24 }}>Enter the PIN to edit content.</p>
             <form onSubmit={login} style={{ display: 'flex', gap: 12 }}>
@@ -88,8 +90,11 @@ export default function AdminPage() {
               <button type="submit" style={{ ...field, border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Sign in</button>
             </form>
             {error && <p style={{ color: '#c0392b', marginTop: 16 }}>{error}</p>}
-            <p style={{ color: '#b6b1a6', marginTop: 32, fontSize: 13 }}>Standalone mode — default PIN is <code>1234</code>. Set DOCSDEV_SITE_ID to use docs.dev team sign-in.</p>
           </>
+        ) : (
+          <p style={{ color: '#8a857a' }}>
+            See the notice above to enable editing on this deployment.
+          </p>
         )}
       </main>
     );
@@ -101,7 +106,6 @@ export default function AdminPage() {
         <h1 style={{ fontSize: 24, fontWeight: 800 }}>docs.dev admin</h1>
         <button onClick={logout} style={{ ...field, padding: '6px 14px', fontSize: 13, background: 'transparent', cursor: 'pointer' }}>Sign out</button>
       </div>
-      {warningBanner}
       <p style={{ color: '#8a857a', marginBottom: 20 }}>Pick a page to edit, or open it on the site and hit “Edit page”.</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {pages.map((p) => (

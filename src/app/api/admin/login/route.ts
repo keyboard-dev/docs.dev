@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { checkPin, sessionToken, SESSION_COOKIE } from '@/lib/admin';
+import { checkPin, pinAuthConfigured, sessionToken, SESSION_COOKIE } from '@/lib/admin';
 import { ssoEnabled } from '@/lib/docsdev-sso';
 
 export async function POST(request: Request) {
@@ -9,6 +9,16 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { ok: false, error: 'This site uses docs.dev sign-in. Go to /api/admin/sso/start.' },
       { status: 403 },
+    );
+  }
+  // No baked-in default — an unconfigured deployment can't be logged into.
+  if (!pinAuthConfigured()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'Standalone login is not configured. Set ADMIN_PIN and ADMIN_SECRET, or use docs.dev sign-in.',
+      },
+      { status: 503 },
     );
   }
 

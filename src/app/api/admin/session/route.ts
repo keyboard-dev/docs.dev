@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminSession, usingDefaultPin } from '@/lib/admin';
+import { getAdminSession, pinAuthConfigured } from '@/lib/admin';
 import { ssoEnabled } from '@/lib/docsdev-sso';
 
 // Lightweight check the client uses to decide whether to show in-app editing,
@@ -14,8 +14,8 @@ export async function GET() {
     sso,
     email: session?.email ?? null,
     role: session?.role ?? null,
-    // Surface the risk instead of leaving it silent — this repo is public,
-    // so the default PIN is not a secret. Only meaningful in standalone mode.
-    defaultPin: !sso && usingDefaultPin(),
+    // Only meaningful in standalone mode — SSO deployments never touch the
+    // PIN path at all.
+    pinConfigured: sso || pinAuthConfigured(),
   });
 }

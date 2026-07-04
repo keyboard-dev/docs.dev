@@ -6,9 +6,14 @@
  *    short-lived JWTs issued by the docs.dev service after it verifies the
  *    user is a member of your team (see lib/docsdev-sso.ts). The PIN path is
  *    disabled entirely in this mode.
- *  - Legacy PIN (standalone fallback): a 4-digit PIN (default 1234, override
- *    with ADMIN_PIN) unlocks an httpOnly cookie storing an HMAC of a constant
- *    keyed by ADMIN_SECRET — never the PIN — validated statelessly.
+ *  - Legacy PIN (standalone fallback): a PIN set via the ADMIN_PIN secret
+ *    unlocks an httpOnly cookie storing an HMAC keyed by ADMIN_SECRET —
+ *    never the PIN itself — validated statelessly.
+ *
+ * There is no baked-in default PIN. This repo is public, so any hardcoded
+ * fallback value is a published constant, not a secret — unset ADMIN_PIN
+ * means the PIN path is disabled (fails closed) rather than silently
+ * accepting a well-known value. Same for ADMIN_SECRET.
  *
  * Edge-runtime safe: baseline content comes from a build-time manifest (no fs)
  * and edits are persisted via the GitHub API, so this runs unchanged on
@@ -21,14 +26,20 @@ import { getDocSource, listDocSlugs } from './content';
 import { ssoEnabled, verifySsoToken, SSO_JWT_COOKIE, type SsoSession } from './docsdev-sso';
 
 const COOKIE = 'docsdev_admin';
-const ADMIN_PIN = process.env.ADMIN_PIN ?? '1234';
-const ADMIN_SECRET = process.env.ADMIN_SECRET ?? 'docs-dev-poc-secret';
+const ADMIN_PIN = process.env.ADMIN_PIN || null;
+const ADMIN_SECRET = process.env.ADMIN_SECRET || null;
+
+/** Whether standalone PIN login is usable at all — both secrets must be set. */
+export function pinAuthConfigured(): boolean {
+  return ADMIN_PIN !== null && ADMIN_SECRET !== null;
+}
 
 export function sessionToken(): string {
-  // Bind the token to the PIN, not just the secret. If an operator only
-  // changes the PIN (and forgets ADMIN_SECRET), a public reader of this repo
-  // still can't compute a valid cookie without also knowing the PIN — so
-  // there's one risk surface (the documented default PIN), not two.
+  if (!ADMIN_PIN || !ADMIN_SECRET) {
+    throw new Error('ADMIN_PIN and ADMIN_SECRET must both be set to use standalone PIN login.');
+  }
+  // Bind the token to the PIN, not just the secret, so leaking one alone
+  // (e.g. a copy-pasted ADMIN_SECRET) doesn't yield a forgeable cookie.
   return createHmac('sha256', ADMIN_SECRET).update(`admin-v1:${ADMIN_PIN}`).digest('hex');
 }
 
@@ -40,12 +51,8 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 export function checkPin(pin: string): boolean {
+  if (!ADMIN_PIN) return false; // fail closed — no default to fall back to
   return safeEqual(pin, ADMIN_PIN);
-}
-
-/** Whether the deployment is still running the (publicly known) default PIN. */
-export function usingDefaultPin(): boolean {
-  return ADMIN_PIN === '1234';
 }
 
 export const SESSION_COOKIE = COOKIE;
@@ -61,6 +68,7 @@ export async function getAdminSession(): Promise<SsoSession | null> {
     if (!token) return null;
     return verifySsoToken(token);
   }
+  if (!pinAuthConfigured()) return null; // nothing to authenticate against
   const value = store.get(COOKIE)?.value;
   if (!value || !safeEqual(value, sessionToken())) return null;
   return { email: 'admin@local', role: 'admin' };

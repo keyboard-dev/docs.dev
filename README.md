@@ -96,8 +96,16 @@ Set runtime secrets (not committed):
 
 ```bash
 wrangler secret put GITHUB_PAT      # token with contents:write — required to publish
-wrangler secret put ADMIN_PIN       # optional, defaults to 1234
+wrangler secret put ADMIN_PIN       # required for standalone /admin login (no default — see below)
+wrangler secret put ADMIN_SECRET    # required alongside ADMIN_PIN — any long random string
 ```
+
+> Both `ADMIN_PIN` and `ADMIN_SECRET` are required to use the standalone
+> `/admin` login. There is no built-in default — this repo is public, so a
+> hardcoded fallback would be a published constant, not a secret. Without
+> both set, `/admin` reports no login is configured until you set them, or
+> switch to team sign-in by setting `DOCSDEV_SITE_ID` (from your docs.dev
+> dashboard) in `wrangler.jsonc` — see `src/lib/docsdev-sso.ts`.
 
 `GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_BRANCH` are non-secret `vars` in
 `wrangler.jsonc`. The public docs need no env vars; the variables only power
