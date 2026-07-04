@@ -91,13 +91,9 @@ export function Flow({
   useEffect(() => {
     let cancelled = false;
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
-    if (fonts?.ready) {
-      fonts.ready.then(() => {
-        if (!cancelled) setFontsReady(true);
-      });
-    } else {
-      setFontsReady(true);
-    }
+    (fonts?.ready ?? Promise.resolve()).then(() => {
+      if (!cancelled) setFontsReady(true);
+    });
     return () => {
       cancelled = true;
     };

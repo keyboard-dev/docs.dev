@@ -1,0 +1,9 @@
+{
+  "title": "Drafts",
+  "description": "Shared drafts visible to every editor, with a last-writer conflict guard.",
+  "pages": [
+    "getDrafts",
+    "deleteDraft",
+    "saveDraft"
+  ]
+}

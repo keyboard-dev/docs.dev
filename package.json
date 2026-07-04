@@ -11,7 +11,8 @@
     "lint": "eslint",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "generate:api": "node scripts/generate-api-docs.mjs"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",
@@ -19,6 +20,7 @@
     "fumadocs-core": "16.10.2",
     "fumadocs-docgen": "^3.0.10",
     "fumadocs-mdx": "15.0.12",
+    "fumadocs-openapi": "^11.0.6",
     "fumadocs-ui": "16.10.2",
     "jose": "^6.2.3",
     "lucide-react": "^1.17.0",

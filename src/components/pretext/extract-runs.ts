@@ -28,6 +28,8 @@ function tagName(type: unknown): string {
  * still has its text preserved (recursed as plain text), so prose is never
  * dropped — at worst a rare mark renders unstyled.
  */
+const BLOCK_TAGS = new Set(['p', 'div', 'blockquote', 'li', 'ul', 'ol']);
+
 export function extractRuns(node: ReactNode, inherited: Inherited = { kind: 'text' }): Run[] {
   const out: Run[] = [];
   Children.forEach(node, (child) => {
@@ -41,6 +43,11 @@ export function extractRuns(node: ReactNode, inherited: Inherited = { kind: 'tex
     if (isValidElement(child)) {
       const props = (child.props ?? {}) as { href?: string; children?: ReactNode };
       const tag = tagName(child.type).toLowerCase();
+
+      if (tag === 'br') {
+        out.push({ text: ' ', kind: inherited.kind });
+        return;
+      }
 
       let kind = inherited.kind;
       let href = inherited.href;
@@ -57,6 +64,11 @@ export function extractRuns(node: ReactNode, inherited: Inherited = { kind: 'tex
       }
 
       out.push(...extractRuns(props.children, { kind, href }));
+      // Block boundaries (multiple paragraphs inside one Spread) must not
+      // fuse the last word of one and the first of the next.
+      if (BLOCK_TAGS.has(tag) && out.length > 0 && !/\s$/.test(out[out.length - 1]!.text)) {
+        out.push({ text: ' ', kind: 'text' });
+      }
     }
   });
   return out;

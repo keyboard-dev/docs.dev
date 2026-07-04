@@ -25,7 +25,9 @@ export function DraftImage(props: ImgHTMLAttributes<HTMLImageElement>) {
         })
         .catch(() => {});
     } else {
-      setResolved(src);
+      queueMicrotask(() => {
+        if (active) setResolved(src);
+      });
     }
     return () => {
       active = false;

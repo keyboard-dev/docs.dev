@@ -17,9 +17,13 @@
  *   </Spread>
  *
  *   <Spread image="/diagram.png" alt="Architecture" side="inline" width="50%">…</Spread>
+ *
+ * The server renders the fallback with the figure floated to its side, so
+ * pre-hydration readers already see close-to-final geometry; pretext then
+ * upgrades the same text into the true both-sides flow.
  */
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import { RichFlow, type FlowObstacle } from './rich-flow';
 import { extractRuns } from './extract-runs';
 import { DraftImage } from '@/components/draft-image';
@@ -33,6 +37,8 @@ export type SpreadProps = {
   alt?: string;
   /** Convenience: render a built-in glowing orb as the figure. */
   orb?: boolean;
+  /** Caption rendered under the figure; the flow reserves space for it. */
+  caption?: string;
   /** Left / Right float, Inline (centered, text both sides), or Full width. */
   side?: 'left' | 'right' | 'inline' | 'full';
   /** Figure width as a percentage of the column (e.g. "42%" or 42). */
@@ -49,7 +55,7 @@ function parsePct(w: number | string | undefined): number {
   return Number.isNaN(n) ? 42 : n;
 }
 
-function Orb() {
+export function Orb() {
   return (
     <div
       aria-hidden
@@ -65,12 +71,22 @@ function Orb() {
   );
 }
 
+/** Approximate the flow with CSS floats for SSR / no-JS readers. */
+function fallbackFigureStyle(side: NonNullable<SpreadProps['side']>, widthPct: number, aspect: number): CSSProperties {
+  const base: CSSProperties = { width: `${widthPct}%`, aspectRatio: `${aspect}`, margin: '6px 0 12px' };
+  if (side === 'full') return { ...base, width: '100%', margin: '6px 0 16px' };
+  if (side === 'inline') return { ...base, marginLeft: 'auto', marginRight: 'auto' };
+  if (side === 'left') return { ...base, float: 'left', marginRight: 24 };
+  return { ...base, float: 'right', marginLeft: 24 };
+}
+
 export function Spread({
   children,
   figure,
   image,
   alt = '',
   orb = false,
+  caption,
   side = 'right',
   width,
   top = 6,
@@ -93,20 +109,40 @@ export function Spread({
     );
   }
 
+  const widthPct = parsePct(width);
+  const aspect = shape === 'circle' ? 1 : 4 / 3;
+
   const obstacles: FlowObstacle[] = node
     ? [
         {
           id: 'spread-figure',
           side,
           shape,
-          widthPct: parsePct(width),
-          aspect: shape === 'circle' ? 1 : 4 / 3,
+          widthPct,
+          aspect,
           anchorTop: top,
           gap,
           node,
+          caption: caption ? { text: caption } : undefined,
         },
       ]
     : [];
 
-  return <RichFlow runs={runs} obstacles={obstacles} fallback={children} />;
+  const fallback = (
+    <div style={{ display: 'flow-root' }}>
+      {node && (
+        <figure style={{ ...fallbackFigureStyle(side, widthPct, aspect), aspectRatio: undefined }}>
+          <div style={{ aspectRatio: `${aspect}` }}>{node}</div>
+          {caption && (
+            <figcaption style={{ marginTop: 8, fontSize: 12.5, lineHeight: '17px', textAlign: 'center', color: 'var(--color-fd-muted-foreground, #888)' }}>
+              {caption}
+            </figcaption>
+          )}
+        </figure>
+      )}
+      {children}
+    </div>
+  );
+
+  return <RichFlow runs={runs} obstacles={obstacles} fallback={fallback} />;
 }

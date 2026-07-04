@@ -1,0 +1,10 @@
+{
+  "title": "Auth",
+  "description": "Sign in with a PIN or GitHub, inspect the session, sign out.",
+  "pages": [
+    "loginWithPin",
+    "loginWithGitHub",
+    "getSession",
+    "logout"
+  ]
+}
