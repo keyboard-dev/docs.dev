@@ -12,7 +12,7 @@ import { usePageDraft } from './use-page-draft';
 const ACCENT = 'var(--docsdev-accent, #c2571f)';
 
 export function DocEditor({ slug, onDone }: { slug: string; onDone?: () => void }) {
-  const { source, authed, status, publishing, onChange, discard, publish } = usePageDraft(slug);
+  const { source, revision, authed, status, publishing, onChange, discard, publish } = usePageDraft(slug);
 
   if (authed === false) {
     return (
@@ -38,7 +38,7 @@ export function DocEditor({ slug, onDone }: { slug: string; onDone?: () => void 
         </span>
       </header>
       <main style={{ maxWidth: 760, margin: '0 auto', padding: '44px 24px 160px' }}>
-        {source == null ? <p style={{ color: '#aaa' }}>Loading…</p> : <EditableDoc key={slug} source={source} onChange={onChange} />}
+        {source == null ? <p style={{ color: '#aaa' }}>Loading…</p> : <EditableDoc key={`${slug}:${revision}`} source={source} onChange={onChange} />}
       </main>
     </div>
   );

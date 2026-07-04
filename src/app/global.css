@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
+@import 'fumadocs-openapi/css/preset.css';
 
 :root {
   /* Brand accent used by the editor UI (bars, buttons, links, the orb).
@@ -15,4 +16,157 @@ html {
 html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* pretext flow                                                        */
+/* ------------------------------------------------------------------ */
+
+/* The upgraded (measured) layout fades in over the SSR fallback instead of
+   popping, so the enhancement reads as a shimmer, not a glitch. */
+@keyframes pretext-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.pretext-flow-layer {
+  animation: pretext-fade-in 0.22s ease-out;
+}
+
+.pretext-link:hover {
+  text-decoration-thickness: 2px;
+  filter: brightness(1.12);
+}
+
+/* ------------------------------------------------------------------ */
+/* in-place editor                                                     */
+/* ------------------------------------------------------------------ */
+
+/* Editable fields: invisible at rest, a whisper of accent on hover, a clear
+   ring while focused. */
+.dd-field {
+  outline: none;
+  border-radius: 6px;
+  transition: box-shadow 0.12s ease;
+}
+
+.dd-field:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--docsdev-accent, #c2571f) 30%, transparent);
+}
+
+.dd-field:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--docsdev-accent, #c2571f) 55%, transparent);
+}
+
+.dd-field:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-fd-muted-foreground);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Table block: row/column tools appear on hover. */
+.dd-tablewrap .dd-tabletools {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+
+.dd-tablewrap:hover .dd-tabletools,
+.dd-tablewrap:focus-within .dd-tabletools {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.dd-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 6px;
+  background: var(--color-fd-popover);
+  color: var(--color-fd-muted-foreground);
+  cursor: pointer;
+  transition: color 0.1s ease, background 0.1s ease;
+}
+
+.dd-icon-btn:hover {
+  color: var(--color-fd-foreground);
+  background: var(--color-fd-accent);
+}
+
+.dd-icon-btn[data-danger]:hover {
+  color: var(--color-fd-error, #dc2626);
+}
+
+/* Floating chrome (toolbars, popovers, chips). */
+.dd-pop {
+  background: var(--color-fd-popover);
+  color: var(--color-fd-popover-foreground);
+  border: 1px solid var(--color-fd-border);
+  border-radius: 12px;
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.16),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.dd-chip-btn {
+  height: 26px;
+  padding: 0 9px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-fd-muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+
+.dd-chip-btn:hover {
+  color: var(--color-fd-foreground);
+  background: var(--color-fd-accent);
+}
+
+.dd-chip-btn[data-on='true'] {
+  background: var(--color-fd-primary);
+  color: var(--color-fd-primary-foreground);
+}
+
+/* Hover-revealed editing chips (code language, card link target): zero
+   layout footprint, paint on parent hover or own focus only. */
+.dd-langchip {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+*:hover > .dd-langchip,
+.dd-langchip:focus {
+  opacity: 1;
+}
+
+/* Shiki output inside the editor's code block card. The viewport div carries
+   the published page's padding classes; the pre itself stays flush. */
+.dd-codeview pre {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+}
+
+/* Reorder-drag insertion indicator. */
+.dd-drop-line {
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--docsdev-accent, #c2571f);
+  z-index: 40;
+  pointer-events: none;
 }

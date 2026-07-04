@@ -64,8 +64,14 @@ export default function PreviewPage() {
 
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get('slug') ?? '';
-    setSlug(s);
-    void load(s);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setSlug(s);
+    });
+    void Promise.resolve().then(() => load(s));
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   return (

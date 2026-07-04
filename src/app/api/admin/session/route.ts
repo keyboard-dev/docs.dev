@@ -1,21 +1,29 @@
 import { NextResponse } from 'next/server';
-import { getAdminSession, pinAuthConfigured } from '@/lib/admin';
+import { pinAuthConfigured, readSession } from '@/lib/admin';
+import { githubOAuthConfigured } from '@/lib/github-auth';
 import { ssoEnabled } from '@/lib/docsdev-sso';
 
 // Lightweight check the client uses to decide whether to show in-app editing,
-// and whether sign-in goes through docs.dev or the standalone PIN.
-// Keeping this client-driven means docs pages stay static (no cookie read at
-// render time).
+// which sign-in methods are available (for the /admin sign-in UI), and the
+// editor's identity (for draft attribution). Keeping this client-driven means
+// docs pages stay static (no cookie read at render time).
 export async function GET() {
   const sso = ssoEnabled();
-  const session = await getAdminSession();
+  const session = await readSession();
   return NextResponse.json({
-    admin: session !== null,
+    admin: session != null,
+    user: session
+      ? {
+          method: session.method,
+          login: session.login,
+          name: session.name,
+          avatar: session.avatar ?? '',
+          role: session.role ?? 'admin',
+        }
+      : null,
+    // Sign-in method availability. With SSO configured it is the only method.
     sso,
-    email: session?.email ?? null,
-    role: session?.role ?? null,
-    // Only meaningful in standalone mode — SSO deployments never touch the
-    // PIN path at all.
+    githubOAuth: !sso && githubOAuthConfigured(),
     pinConfigured: sso || pinAuthConfigured(),
   });
 }

@@ -18,6 +18,8 @@ export type SpreadAttrs = {
   orb?: boolean;
   image?: string;
   alt?: string;
+  /** Caption rendered under the figure. */
+  caption?: string;
 };
 
 export type SpreadMatch = {
@@ -54,8 +56,11 @@ export function parseAttrs(raw: string): SpreadAttrs {
   for (const m of raw.matchAll(/(\w+)="([^"]*)"/g)) {
     (attrs as Record<string, string>)[m[1]!] = m[2]!;
   }
-  // boolean key (e.g. `orb`) — present without a value
-  for (const m of raw.matchAll(/(?:^|\s)(\w+)(?=\s|$)(?![=])/g)) {
+  // boolean key (e.g. `orb`) — present without a value. Scan with quoted
+  // values blanked out so words inside alt="…"/caption="…" aren't mistaken
+  // for boolean keys.
+  const noStrings = raw.replace(/"[^"]*"/g, '""').replace(/\{[^}]*\}/g, '{}');
+  for (const m of noStrings.matchAll(/(?:^|\s)(\w+)(?=\s|$)(?![=])/g)) {
     if (!(m[1]! in attrs)) (attrs as Record<string, boolean>)[m[1]!] = true;
   }
   // Normalize width: accept "42%" or 42 → a number percentage.
@@ -71,7 +76,8 @@ export function serializeAttrs(attrs: SpreadAttrs): string {
   const parts: string[] = [];
   if (attrs.orb) parts.push('orb');
   if (attrs.image) parts.push(`image="${attrs.image}"`);
-  if (attrs.alt) parts.push(`alt="${attrs.alt}"`);
+  if (attrs.alt) parts.push(`alt="${attrs.alt.replace(/"/g, '”')}"`);
+  if (attrs.caption) parts.push(`caption="${attrs.caption.replace(/"/g, '”')}"`);
   if (attrs.side) parts.push(`side="${attrs.side}"`);
   if (attrs.width != null) parts.push(`width="${Math.round(attrs.width)}%"`);
   for (const key of ['top', 'gap'] as const) {

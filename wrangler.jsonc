@@ -5,20 +5,40 @@
   "compatibility_date": "2025-03-25",
   // nodejs_compat provides node:crypto / Buffer, which the admin auth uses.
   "compatibility_flags": ["nodejs_compat"],
+  // Without this, esbuild's keepNames injects __name(...) helpers into
+  // functions Next.js serializes into inline <script> tags, throwing
+  // "__name is not defined" in the browser on every page.
+  "keep_names": false,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  // Set secrets with `wrangler secret put GITHUB_PAT` (and ADMIN_PIN etc.).
-  // These vars only power the optional /admin editor's publish flow — point
-  // them at YOUR copy of this repo after creating it from the template.
+  // Workers AI powers the editor's "Generate with AI" (docs writing) and
+  // image generation. Models overridable via AI_TEXT_MODEL / AI_IMAGE_MODEL.
+  "ai": {
+    "binding": "AI"
+  },
+  // Set secrets with `wrangler secret put <NAME>`:
+  //   GITHUB_PAT                — server fallback credential (PIN/docs.dev
+  //                               sessions, shared drafts branch)
+  //   ADMIN_PIN, ADMIN_SECRET   — PIN sign-in + session sealing key (no
+  //                               defaults; standalone login fails closed
+  //                               without them)
+  //   GITHUB_APP_CLIENT_ID      — GitHub App OAuth ("Sign in with GitHub":
+  //   GITHUB_APP_CLIENT_SECRET     register a GitHub App with callback URL
+  //                                <site>/api/auth/github/callback, enable
+  //                                user authorization, install on the repo)
+  //   TAVILY_API_KEY or BRAVE_API_KEY — optional web search grounding for
+  //                                "Generate with AI" (skipped when unset)
+  // Non-secret defaults can live here:
   "vars": {
     "GITHUB_OWNER": "keyboard-dev",
     "GITHUB_REPO": "docs.dev",
     "GITHUB_BRANCH": "main",
     // Team sign-in via docs.dev. Register your site in the docs.dev dashboard
     // (redirect URI: https://<your-host>/api/admin/sso/callback), then paste
-    // the Site ID here. Leave empty for standalone PIN auth.
+    // the Site ID here. When set, docs.dev sign-in is the ONLY method — PIN
+    // and GitHub App OAuth are disabled. Leave empty for standalone auth.
     "DOCSDEV_SITE_ID": "",
     "DOCSDEV_ISSUER": "https://app.docs.dev"
   }

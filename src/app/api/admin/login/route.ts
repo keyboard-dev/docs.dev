@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { checkPin, pinAuthConfigured, sessionToken, SESSION_COOKIE } from '@/lib/admin';
+import { checkPin, pinAuthConfigured, sealSession, SESSION_COOKIE, SESSION_MAX_AGE_S } from '@/lib/admin';
 import { ssoEnabled } from '@/lib/docsdev-sso';
 
 export async function POST(request: Request) {
@@ -27,12 +27,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Invalid PIN' }, { status: 401 });
   }
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, sessionToken(), {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 60 * 8,
-  });
+  res.cookies.set(
+    SESSION_COOKIE,
+    sealSession({ method: 'pin', login: 'admin', name: 'Admin', exp: Date.now() + SESSION_MAX_AGE_S * 1000 }),
+    {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: SESSION_MAX_AGE_S,
+    },
+  );
   return res;
 }
