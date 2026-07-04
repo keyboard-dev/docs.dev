@@ -2,7 +2,8 @@
 #
 # Netlify auto-detects Next.js and installs @netlify/plugin-nextjs (declared
 # below so it's explicit). Set the env vars in Site settings → Environment:
-#   ADMIN_PIN     admin editor PIN          (optional, defaults to 1234)
+#   ADMIN_PIN     admin editor PIN          (required for standalone login — no default)
+#   ADMIN_SECRET  cookie signing secret     (required alongside ADMIN_PIN — any long random string)
 #   GITHUB_PAT    token with contents:write (required to publish edits)
 #   GITHUB_OWNER  repo owner                (optional, defaults to gitConfig)
 #   GITHUB_REPO   repo name                 (optional)

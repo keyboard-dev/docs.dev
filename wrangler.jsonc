@@ -10,10 +10,16 @@
     "binding": "ASSETS"
   },
   // Set secrets with `wrangler secret put GITHUB_PAT` (and ADMIN_PIN etc.).
-  // Non-secret defaults can live here:
+  // These vars only power the optional /admin editor's publish flow — point
+  // them at YOUR copy of this repo after creating it from the template.
   "vars": {
     "GITHUB_OWNER": "keyboard-dev",
     "GITHUB_REPO": "docs.dev",
-    "GITHUB_BRANCH": "claude/charming-clarke-7l1ric"
+    "GITHUB_BRANCH": "main",
+    // Team sign-in via docs.dev. Register your site in the docs.dev dashboard
+    // (redirect URI: https://<your-host>/api/admin/sso/callback), then paste
+    // the Site ID here. Leave empty for standalone PIN auth.
+    "DOCSDEV_SITE_ID": "",
+    "DOCSDEV_ISSUER": "https://app.docs.dev"
   }
 }
