@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "docs-dev",
+  "name": "docsdotdev",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-25",
   // nodejs_compat provides node:crypto / Buffer, which the admin auth uses.
