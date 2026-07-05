@@ -1,0 +1,51 @@
+---
+title: Configuration reference
+description: Every variable and secret your docs site understands, in one place.
+---
+
+Configuration lives in two places: non-secret **vars** in `wrangler.jsonc`
+(committed to your repo), and **secrets** set with `wrangler secret put NAME`
+(or in your Worker's dashboard under Settings → Variables and Secrets). For
+local development, put secrets in a `.dev.vars` file (never committed).
+
+## Variables (`wrangler.jsonc` → `vars`)
+
+| Variable | Purpose |
+| --- | --- |
+| `GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_BRANCH` | Where the editor publishes — point these at **your** repo and default branch. |
+| `DOCSDEV_SITE_ID` | Enables [team sign-in](/docs/team). When set, it's the only sign-in method. Empty = standalone mode. |
+| `DOCSDEV_ISSUER` | The docs.dev service origin (leave the default unless self-hosting the service). |
+| `AI_TEXT_MODEL` / `AI_IMAGE_MODEL` | Override the [Workers AI models](/docs/ai) used by the editor. |
+
+## Secrets
+
+| Secret | Needed for |
+| --- | --- |
+| `GITHUB_PAT` | Publishing from PIN/docs.dev sessions and the shared-drafts store. Fine-grained token, `contents: read/write` on the docs repo. |
+| `ADMIN_PIN` + `ADMIN_SECRET` | [PIN sign-in](/docs/standalone-auth#pin-sign-in). Both required; no defaults — editing stays disabled without them. |
+| `GITHUB_APP_CLIENT_ID` + `GITHUB_APP_CLIENT_SECRET` | [GitHub sign-in](/docs/standalone-auth#github-sign-in). |
+| `TAVILY_API_KEY` *or* `BRAVE_API_KEY` | Optional [web-search grounding](/docs/ai#grounding-with-web-search-optional) for AI writing. |
+
+## Sign-in precedence
+
+1. **`DOCSDEV_SITE_ID` set** → docs.dev team sign-in only. PIN and GitHub
+   sign-in are disabled, so stale credentials can't bypass team membership.
+2. **Otherwise** → whichever of GitHub sign-in and PIN you've configured
+   (both is fine). Nothing configured = editing disabled, docs still served.
+
+## Commands
+
+```bash
+pnpm dev              # local dev server
+pnpm types:check      # frontmatter + type validation — run before pushing
+pnpm cf:preview       # build and run the real Worker locally
+pnpm cf:deploy        # manual deploy (normally unnecessary — pushing deploys)
+```
+
+## CI (Workers Builds)
+
+The one-click deploy configures these automatically; if you're setting up CI
+by hand, use:
+
+- **Build command:** `npx opennextjs-cloudflare build`
+- **Deploy command:** `npx wrangler deploy`

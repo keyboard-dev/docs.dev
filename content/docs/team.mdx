@@ -1,0 +1,70 @@
+---
+title: Team sign-in
+description: Let your whole team edit with docs.dev accounts — invite members, control access centrally.
+---
+
+Team sign-in connects your site's editor to a docs.dev team: editors sign in
+with their own docs.dev account (GitHub identity), and only people you've
+invited can get in. No shared PINs, no per-person GitHub repo access to
+manage — invite someone once and they can edit; remove them once and they
+can't.
+
+## Set it up
+
+1. **Create your account** at your docs.dev dashboard — sign in with GitHub.
+   Your team is created automatically.
+2. **Register your site**: add its name and its sign-in callback URL —
+   exactly your deployed site's origin plus `/api/admin/sso/callback`, e.g.
+
+   ```
+   https://docs.example.com/api/admin/sso/callback
+   ```
+
+   You get back a **Site ID**.
+3. **Configure your site**: in your repo's `wrangler.jsonc`, set
+
+   ```jsonc
+   "DOCSDEV_SITE_ID": "site_…"   // from the dashboard
+   ```
+
+   Commit and push — your CI redeploys with team sign-in enabled.
+4. **Invite your team** from the dashboard by email. Invitees accept, sign in
+   with GitHub, and can immediately use your site's `/admin`.
+
+## Roles
+
+- **Admin** (the team owner): manages members and registered sites, and can
+  edit.
+- **Editor** (everyone you invite): can edit and publish.
+
+## The security model
+
+Team sign-in is a standard OAuth 2.0 authorization-code flow with PKCE, and
+it's deliberately strict:
+
+- **Exact-match redirect whitelist.** Sign-ins can only ever be sent back to
+  the callback URL registered for your site — exact string match, HTTPS only,
+  no wildcards. A look-alike domain can't borrow your sign-in.
+- **Membership is checked centrally** before a sign-in completes. Someone who
+  isn't on your team gets a clear "ask an admin to invite you," never a
+  session.
+- **No secrets on your site.** The flow uses PKCE, and your site verifies
+  sessions against docs.dev's published public keys (JWKS). Nothing
+  confidential ships in your repo or your Worker.
+- **Sessions are short-lived** signed tokens carrying the editor's identity
+  and role — which is also how draft attribution works.
+
+<Callout title="Team sign-in is exclusive" type="warn">
+  When `DOCSDEV_SITE_ID` is set, it is the only way in: the PIN and GitHub
+  sign-in paths are disabled so a leftover credential can't bypass your team's
+  membership list.
+</Callout>
+
+## What stays yours
+
+Your published site never depends on docs.dev to serve a page — the sign-in
+check happens only when an editor signs in. If docs.dev is unreachable,
+readers notice nothing, and already-signed-in editors keep working until
+their session expires. And if you ever leave, remove one variable and switch
+to [standalone sign-in](/docs/standalone-auth) — everything else keeps
+working.

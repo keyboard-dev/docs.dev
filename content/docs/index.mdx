@@ -1,13 +1,47 @@
 ---
-title: Hello World
-description: Your first document
+title: Welcome to docs.dev
+description: Documentation that reads like a designed page — in a repo you own, on infrastructure you control.
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+docs.dev is a documentation platform built on a bet most docs tools won't make:
+**you should own everything.** Your docs live in your GitHub repository, your
+site runs on your Cloudflare account, and if you stop using docs.dev tomorrow,
+your site keeps working. What we add on top is the part you actually want from
+a docs product: a beautiful reading experience, an editor your whole team can
+use, and sign-in that stays out of your way.
 
-## What is Next?
+## What makes it different
+
+- **A reading experience, not a wall of blocks.** Prose flows around figures,
+  code, and shapes — like a magazine spread — powered by the
+  [pretext](https://github.com/chenglou/pretext) layout engine. The text stays
+  real, selectable, indexable DOM. See [the reading experience](/docs/reading-experience).
+- **Your repo is the source of truth.** Every page is an MDX file. Publishing
+  from the editor is a git commit. Your history, your pull requests, your
+  rollbacks.
+- **Your infrastructure.** One click deploys to *your* Cloudflare account with
+  CI wired up. AI features run on Workers AI — also yours. There is no hosting
+  bill from us and no lock-in to escape later.
+- **Built for agents.** The repo ships a `CLAUDE.md` and skills, so pointing
+  Claude Code at your docs works on day one: "add a quickstart page" is a
+  one-line request.
+
+## Start here
 
 <Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+  <Card title="Getting started" href="/docs/getting-started" description="Deploy your docs site in one click and make your first edit." />
+  <Card title="Editing" href="/docs/editing" description="The on-page editor, shared drafts, publishing, and editing with Claude Code." />
+  <Card title="The reading experience" href="/docs/reading-experience" description="How prose flows around figures — and how to use it in your pages." />
+  <Card title="Team sign-in" href="/docs/team" description="Give your whole team access with docs.dev accounts and roles." />
 </Cards>
+
+## How it fits together
+
+Your site is a Next.js app (Fumadocs + the pretext engine) deployed to
+Cloudflare Workers from your own repository. Everything the editor does —
+sign-in, drafts, publishing, AI generation — goes through your site's own
+same-origin API, documented in the [API reference](/docs/api-reference).
+The optional docs.dev service adds one thing: [team sign-in](/docs/team),
+so editors authenticate with their docs.dev account instead of shared
+credentials. It's a sign-in check, not a dependency — your published site
+never needs us to serve a single page.
