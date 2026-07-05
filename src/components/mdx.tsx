@@ -9,7 +9,10 @@ export function getMDXComponents(components?: MDXComponents) {
   return {
     ...defaultMdxComponents,
     // Resolve locally-uploaded draft assets; falls back to the real URL.
-    img: DraftImage,
+    // Cast: MDXComponents types img src as string, but fumadocs-mdx actually
+    // passes a static-import object for Markdown images — DraftImage handles
+    // both shapes.
+    img: DraftImage as NonNullable<MDXComponents['img']>,
     // Tabs for tabbed content + package-install (npm/pnpm/yarn/bun) blocks.
     Tab,
     Tabs,
