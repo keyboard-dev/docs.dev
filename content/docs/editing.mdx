@@ -1,0 +1,62 @@
+---
+title: Editing
+description: Edit pages in place, share drafts with your team, and publish with a git commit.
+---
+
+## The editor is the page
+
+There's no separate "editor view" that approximates your site. Hit
+**Edit page** on any page (or pick one from `/admin`) and the page itself
+becomes editable — same typography, same layout engine, same flowing prose.
+What you see while editing is exactly what readers get, including text
+reflowing live around figures as you drag or resize them.
+
+Blocks can be inserted, reordered, and deleted in place: prose, code blocks
+(with editable tabs), callouts, cards, images, and
+[Spread figures](/docs/reading-experience) that prose flows around.
+
+## Drafts are shared
+
+Edits autosave as drafts — instantly to your browser, and (debounced) to a
+shared store the rest of your team sees. A teammate opening the same page
+picks up your draft, with the author shown, and conflicting edits are caught
+rather than silently overwritten.
+
+Shared drafts live in a dedicated `docsdev-drafts` branch of your own repo —
+no extra infrastructure, and your drafts are as private as your repository.
+
+## Publishing is a commit
+
+**Publish** commits the page (and any uploaded images) to your repo via the
+GitHub API, and your push-to-deploy CI takes it from there — changes are live
+in about a minute. Depending on how you signed in:
+
+- **GitHub sign-in:** the commit is authored by *you* — real attribution in
+  your git history.
+- **docs.dev or PIN sign-in:** the commit uses the site's `GITHUB_PAT`
+  server credential.
+
+Because published pages are just MDX in git, everything you already do with
+code applies to docs: branches, pull requests, reviews, reverts.
+
+## Editing with Claude Code
+
+The repo is agent-ready: `CLAUDE.md` teaches the conventions (where pages
+live, frontmatter, nav, how to verify) and ships a `/new-page` skill. Typical
+session:
+
+```bash
+cd your-docs-repo
+claude
+# > document the new webhooks API — endpoint list is in src/routes/webhooks.ts
+```
+
+Claude writes the pages, registers them in the nav, runs `pnpm types:check`,
+and pushes. The push deploys. For content that needs a human eye first, ask it
+to open a pull request instead.
+
+<Callout title="Files always win">
+  The editor and the repo never fight: the repo is the only source of truth.
+  Editor publishes are commits; agent and human edits are commits. Whatever
+  lands on the default branch is what deploys.
+</Callout>

@@ -1,0 +1,13 @@
+{
+  "pages": [
+    "index",
+    "getting-started",
+    "editing",
+    "reading-experience",
+    "ai",
+    "team",
+    "standalone-auth",
+    "configuration",
+    "api-reference"
+  ]
+}
