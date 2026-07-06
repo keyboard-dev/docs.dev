@@ -1,0 +1,9 @@
+/*
+ * Site theme — the single place your brand color lives.
+ *
+ * Edit by hand, or use the admin sidebar's "Theme…" picker: it previews the
+ * change live and commits this file via /api/admin/theme when you publish.
+ */
+:root {
+  --docsdev-accent: #c2571f;
+}

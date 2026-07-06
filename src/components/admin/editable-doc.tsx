@@ -80,17 +80,27 @@ const SIDES: Array<NonNullable<SpreadAttrs['side']>> = ['left', 'inline', 'right
 /* small utilities                                                     */
 /* ------------------------------------------------------------------ */
 
-type CardItem = { title: string; href: string };
+type CardItem = { title: string; href: string; description?: string };
 function parseCards(raw: string): CardItem[] {
   const items: CardItem[] = [];
   for (const m of raw.matchAll(/<Card\b([^>]*?)\/?>/g)) {
     const a = m[1] ?? '';
-    items.push({ title: (a.match(/title="([^"]*)"/) ?? [])[1] ?? '', href: (a.match(/href="([^"]*)"/) ?? [])[1] ?? '/' });
+    items.push({
+      title: (a.match(/title="([^"]*)"/) ?? [])[1] ?? '',
+      href: (a.match(/href="([^"]*)"/) ?? [])[1] ?? '/',
+      description: (a.match(/description="([^"]*)"/) ?? [])[1],
+    });
   }
   return items;
 }
 function serializeCards(items: CardItem[]): string {
-  return '<Cards>\n' + items.map((it) => `  <Card title="${it.title}" href="${it.href}" />`).join('\n') + '\n</Cards>';
+  return (
+    '<Cards>\n' +
+    items
+      .map((it) => `  <Card title="${it.title}" href="${it.href}"${it.description ? ` description="${it.description}"` : ''} />`)
+      .join('\n') +
+    '\n</Cards>'
+  );
 }
 
 function metaLine(fm: string, key: string): string {
@@ -1582,8 +1592,26 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
         );
       case 'callout': {
         const type = (b.props.match(/type="(\w+)"/) ?? [])[1] ?? 'info';
+        // The title attr renders as the callout's bold first line — keep it
+        // visible and editable so the box matches the published geometry.
+        const title = (b.props.match(/title="([^"]*)"/) ?? [])[1];
+        const setTitle = (md: string) =>
+          update(b.id, {
+            props: /title="/.test(b.props)
+              ? b.props.replace(/title="[^"]*"/, `title="${md.replace(/"/g, '')}"`)
+              : `${b.props} title="${md.replace(/"/g, '')}"`.trim(),
+          });
         return (
-          <Callout key={b.id} type={type as 'info'} data-block-index={i}>
+          <Callout
+            key={b.id}
+            type={type as 'info'}
+            data-block-index={i}
+            title={
+              title != null
+                ? editableField('div', `${b.id}:ctitle`, mdInlineToHtml(title), () => {}, setTitle, { placeholder: 'Callout title' })
+                : undefined
+            }
+          >
             {field('div', b.id, mdInlineToHtml(b.text), (md) => update(b.id, { text: md }), { placeholder: 'Callout text' })}
           </Callout>
         );
@@ -1599,7 +1627,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
               <button
                 className="dd-chip-btn"
                 style={{ height: 22, display: 'flex', alignItems: 'center', gap: 4 }}
-                onClick={(e) => { e.stopPropagation(); setItems([...items, { title: 'New card', href: '/' }]); }}
+                onClick={(e) => { e.stopPropagation(); setItems([...items, { title: 'New card', href: '/', description: '' }]); }}
               >
                 <Plus size={12} /> Card
               </button>
@@ -1617,6 +1645,11 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
                   placeholder: 'Card title',
                   className: 'not-prose mb-1 text-sm font-medium',
                 })}
+                {it.description != null &&
+                  editableField('p', `${b.id}d${ci}`, mdInlineToHtml(it.description), () => {}, (md) => setItems(items.map((x, j) => (j === ci ? { ...x, description: md } : x))), {
+                    placeholder: 'Card description',
+                    className: 'not-prose my-0 text-sm text-fd-muted-foreground',
+                  })}
                 {/* The link target edits in a floating chip (shown on hover),
                     so the card keeps the published <Card> geometry. */}
                 <input

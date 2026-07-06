@@ -2,11 +2,92 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-openapi/css/preset.css';
+@import './theme.css';
+
+/* ------------------------------------------------------------------ */
+/* fonts (self-hosted, no build-time or runtime Google requests)       */
+/* ------------------------------------------------------------------ */
+
+/* Geist — body text (variable weight). */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Geist Mono — the meta layer: descriptions, captions, labels, TOC. */
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist-mono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist-mono-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Geist Pixel — display face for headings (single 400 weight). */
+@font-face {
+  font-family: 'Geist Pixel';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/geist-pixel-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Geist Pixel';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/geist-pixel-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
 :root {
-  /* Brand accent used by the editor UI (bars, buttons, links, the orb).
-     Override this one variable to rebrand docs.dev for your site. */
-  --docsdev-accent: #c2571f;
+  /* The brand accent (--docsdev-accent) lives in theme.css — edit it there
+     or through the admin sidebar's "Theme…" picker. */
+
+  /* Brand type: pixel display headings, Geist body, Geist Mono meta.
+     Code blocks keep the default mono stack (--font-meta is NOT the
+     code font — it's for descriptions, captions, and labels). */
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-pixel: 'Geist Pixel', 'Geist', ui-sans-serif, sans-serif;
+  --font-meta: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+/* Headings across the site (docs, landing, admin) use the pixel face.
+   It ships one weight, so suppress faux-bold synthesis and utility
+   tracking — pixel glyphs want their native spacing. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: 0;
 }
 
 html {
@@ -22,26 +103,35 @@ html > body[data-scroll-locked] {
 /* typography & spacing polish                                         */
 /* ------------------------------------------------------------------ */
 
-/* Page title: more presence, tight tracking, balanced wrapping — the
-   scale Stripe/WorkOS use for their article headers. */
+/* Page title: more presence, balanced wrapping — the scale
+   Stripe/WorkOS use for their article headers. (Tracking stays at the
+   pixel face's native spacing.) */
 article h1 {
   font-size: 2.125rem;
-  letter-spacing: -0.025em;
   line-height: 1.2;
   text-wrap: balance;
 }
 
-/* The one-line description under the title breathes a little more. */
+/* The one-line description under the title: the mono meta voice. */
 article h1 + p.text-lg {
-  margin-top: 0.625rem;
-  line-height: 1.6;
+  margin-top: 0.75rem;
+  font-family: var(--font-meta);
+  font-size: 0.9375rem;
+  line-height: 1.65;
 }
 
-/* Section headings: subtle tightening, no orphaned last words. */
+/* Section headings: no orphaned last words. */
 .prose h2,
 .prose h3 {
-  letter-spacing: -0.02em;
   text-wrap: balance;
+}
+
+/* The meta layer speaks Geist Mono: figure captions, sidebar section
+   labels, and the table of contents. Code blocks are untouched — they
+   keep the default code font stack. */
+article figcaption,
+#nd-toc {
+  font-family: var(--font-meta);
 }
 
 /* Body copy avoids ragged breaks and lonely last lines. */
@@ -50,8 +140,10 @@ article h1 + p.text-lg {
   text-wrap: pretty;
 }
 
-/* Inline code as a quiet chip (Stripe-style), not a bare highlight. */
+/* Inline code as a quiet chip (Stripe-style), not a bare highlight —
+   set in Geist Mono (fenced code blocks keep their own font). */
 .prose :not(pre) > code {
+  font-family: var(--font-meta);
   border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
   background: color-mix(in srgb, currentColor 5%, transparent);
   border-radius: 6px;
@@ -87,6 +179,7 @@ article h1 + p.text-lg {
 /* Sidebar section labels (meta.json separators): small caps, muted,
    generously spaced — the grouped look of Stripe's docs nav. */
 #nd-sidebar p.inline-flex {
+  font-family: var(--font-meta);
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.08em;

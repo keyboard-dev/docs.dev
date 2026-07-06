@@ -73,7 +73,7 @@ const useIsomorphicLayoutEffect =
 export function Flow({
   text,
   obstacles = [],
-  fontFamily = 'Georgia, "Times New Roman", serif',
+  fontFamily = "'Geist', ui-sans-serif, system-ui, sans-serif",
   fontSize = 19,
   fontWeight = 400,
   lineHeight = 32,
