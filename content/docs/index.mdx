@@ -12,10 +12,16 @@ use, and sign-in that stays out of your way.
 
 ## What makes it different
 
-- **A reading experience, not a wall of blocks.** Prose flows around figures,
-  code, and shapes — like a magazine spread — powered by the
-  [pretext](https://github.com/chenglou/pretext) layout engine. The text stays
-  real, selectable, indexable DOM. [See it live on the home page](/).
+<Spread image="/uploads/flow-around-figure.webp" alt="Lines of text flowing around a glowing figure on both sides" side="right" width="34%" top={6}>
+**A reading experience, not a wall of blocks.** Prose flows around figures,
+code, and shapes — like the paragraph you are reading right now — powered by
+the [pretext](https://github.com/chenglou/pretext) layout engine. Every run of
+text is measured with canvas arithmetic and placed as real, selectable,
+indexable DOM text on **both** sides of a figure at once, which CSS floats and
+CSS Shapes cannot express. Resize the window and the words re-measure and
+re-break against the live column width. [See it live on the home page](/).
+</Spread>
+
 - **Your repo is the source of truth.** Every page is an MDX file. Publishing
   from the editor is a git commit. Your history, your pull requests, your
   rollbacks.

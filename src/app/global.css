@@ -19,6 +19,84 @@ html > body[data-scroll-locked] {
 }
 
 /* ------------------------------------------------------------------ */
+/* typography & spacing polish                                         */
+/* ------------------------------------------------------------------ */
+
+/* Page title: more presence, tight tracking, balanced wrapping — the
+   scale Stripe/WorkOS use for their article headers. */
+article h1 {
+  font-size: 2.125rem;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+/* The one-line description under the title breathes a little more. */
+article h1 + p.text-lg {
+  margin-top: 0.625rem;
+  line-height: 1.6;
+}
+
+/* Section headings: subtle tightening, no orphaned last words. */
+.prose h2,
+.prose h3 {
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* Body copy avoids ragged breaks and lonely last lines. */
+.prose p,
+.prose li {
+  text-wrap: pretty;
+}
+
+/* Inline code as a quiet chip (Stripe-style), not a bare highlight. */
+.prose :not(pre) > code {
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border-radius: 6px;
+  padding: 0.1em 0.3em;
+}
+
+/* Quotes carry the brand accent instead of a gray default. */
+.prose blockquote {
+  border-inline-start: 3px solid color-mix(in srgb, var(--docsdev-accent, #c2571f) 55%, transparent);
+  background: color-mix(in srgb, var(--docsdev-accent, #c2571f) 4%, transparent);
+  border-radius: 0 10px 10px 0;
+  padding-block: 0.125rem;
+}
+/* The padding above stops inner <p> margins from collapsing out of the quote;
+   drop them so the box stays tight (and matches the editor's quote block). */
+.prose blockquote > :first-child {
+  margin-top: 0;
+}
+.prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* Cards: lift gently on hover with an accent-tinted border. */
+.prose a.bg-fd-card {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, translate 0.15s ease;
+}
+.prose a.bg-fd-card:hover {
+  border-color: color-mix(in srgb, var(--docsdev-accent, #c2571f) 45%, transparent);
+  box-shadow: 0 4px 16px -6px color-mix(in srgb, var(--docsdev-accent, #c2571f) 25%, transparent);
+  translate: 0 -1px;
+}
+
+/* Sidebar section labels (meta.json separators): small caps, muted,
+   generously spaced — the grouped look of Stripe's docs nav. */
+#nd-sidebar p.inline-flex {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-fd-muted-foreground);
+  margin-top: 1.75rem;
+  margin-bottom: 0.375rem;
+}
+
+/* ------------------------------------------------------------------ */
 /* pretext flow                                                        */
 /* ------------------------------------------------------------------ */
 

@@ -1,11 +1,15 @@
 {
   "pages": [
+    "---Get started---",
     "index",
     "getting-started",
+    "---Editing---",
     "editing",
     "ai",
+    "---Access---",
     "team",
     "standalone-auth",
+    "---Reference---",
     "configuration",
     "api-reference"
   ]
