@@ -1,0 +1,12 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "---Get started---",
+    "index",
+    "---Writing---",
+    "reading-experience",
+    "test",
+    "---Reference---",
+    "api-reference"
+  ]
+}

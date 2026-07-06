@@ -1,13 +1,36 @@
 ---
-title: Hello World
-description: Your first document
+title: Welcome to docs.dev
+description: Documentation that reads like a magazine — and edits in place.
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+Most documentation tools give you a rectangle of text and an editor that looks
+nothing like the page your readers see. docs.dev collapses that distance twice:
+prose flows around figures the way a well-set magazine column does, and when
+you hit *Edit*, the published page itself becomes the editor.
 
-## What is Next?
+<Spread image="/uploads/flow-around-figure.webp" alt="Lines of text flowing around a glowing figure on both sides" side="right" width="38%" top={6}>
+The layout engine under this page is [pretext](https://github.com/chenglou/pretext):
+every run of text is measured with canvas arithmetic and placed as real,
+selectable DOM text — on **both** sides of a figure at once, which CSS floats
+and CSS Shapes cannot express. Resize the window and the paragraph you are
+reading re-measures and re-breaks against the live column width. Search
+engines and screen readers always get the same words in clean reading order,
+because the flowed layout is a progressive enhancement over an ordinary
+paragraph, not a hidden copy of it.
+</Spread>
+
+## Start here
 
 <Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+  <Card title="The reading experience" description="How prose flows around figures — and why it stays fast and accessible." href="/docs/reading-experience" />
+  <Card title="Components" description="Code blocks, code tabs, package-manager tabs, tables, and everything Markdown." href="/docs/test" />
+  <Card title="API reference" description="The API behind the in-site editor, generated from its OpenAPI schema." href="/docs/api-reference" />
 </Cards>
+
+## Editing, without an editor
+
+Sign in and every page grows an *Edit* button. Headings, prose, code, tables,
+even the figure spreads above are editable in place — same column, same
+typography, same rhythm you are reading now. Drafts autosave locally and share
+to your team instantly, and publishing commits straight to GitHub with your
+name on the commit.

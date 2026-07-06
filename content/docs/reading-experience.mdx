@@ -49,8 +49,13 @@ widths would leave slivers of unreadable text.
 
 ## How it stays fast and accessible
 
+<Spread image="/uploads/pebble-paperweight.webp" alt="A terracotta pebble resting on linen, with dashed lines flowing around it" side="left" width="34%" caption="Nothing moves until the text has been measured — the figure is just a stone in the stream.">
 The server renders the prose above as a normal paragraph first, so search
 engines and assistive technology always get clean text in reading order. After
 the page hydrates, the client measures and repositions that same text into the
 flowed layout. Same words, just placed differently — progressive enhancement,
-not a hidden copy.
+not a hidden copy. There is no layout thrash in the process either: pretext
+measures every fragment against an off-screen canvas, so the browser never
+reflows while the geometry is being computed, and the finished arrangement
+lands in a single paint.
+</Spread>
