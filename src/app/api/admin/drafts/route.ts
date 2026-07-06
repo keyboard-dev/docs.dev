@@ -49,10 +49,10 @@ export async function PUT(request: Request) {
   try {
     const existing = await store.get(body.slug);
     const base = body.baseUpdatedAt ?? 0;
-    // GitHub sessions carry a verified identity; PIN sessions fall back to
-    // the client's self-reported display name.
+    // GitHub and docs.dev sessions carry a verified identity; PIN sessions
+    // fall back to the client's self-reported display name.
     const author =
-      session.method === 'github'
+      session.method === 'github' || session.method === 'docsdev'
         ? (session.name || session.login).slice(0, 60)
         : (body.author ?? 'Anonymous').slice(0, 60);
     if (existing && existing.updatedAt > base && existing.author !== author) {

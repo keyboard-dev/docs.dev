@@ -1,18 +1,25 @@
 /**
  * Admin sessions + content helpers.
  *
- * Two ways in, one session model:
+ * Three ways in, one session model:
+ *   - docs.dev sign-in (recommended): set DOCSDEV_SITE_ID and sessions are
+ *     short-lived JWTs issued by the docs.dev service after it verifies the
+ *     user is a member of your team (see lib/docsdev-sso.ts). When SSO is
+ *     configured, the other paths are disabled entirely — a leftover PIN or
+ *     GitHub App config must not bypass team membership.
  *   - GitHub sign-in (a GitHub App's OAuth user flow): real identity, and
  *     authorization = push access on the docs repo. Commits made while
  *     signed in this way are attributed to the actual editor.
- *   - PIN (default 1234, override with ADMIN_PIN): the original lightweight
- *     path, kept for solo use, local dev, and automated tests.
+ *   - PIN (standalone fallback): set via the ADMIN_PIN secret. There is no
+ *     baked-in default — this repo is public, so any hardcoded fallback is a
+ *     published constant, not a secret. Unset means the PIN path fails
+ *     closed. Same for ADMIN_SECRET.
  *
- * The session is an AES-256-GCM-sealed JSON payload in an httpOnly cookie
- * (GCM gives both secrecy for the embedded GitHub token and integrity, so no
- * separate signature is needed). The key derives from ADMIN_SECRET. Legacy
- * HMAC-constant cookies from older sessions are still accepted as PIN
- * sessions.
+ * PIN and GitHub sessions are AES-256-GCM-sealed JSON payloads in an httpOnly
+ * cookie (GCM gives both secrecy for the embedded GitHub token and integrity,
+ * so no separate signature is needed). The key derives from ADMIN_SECRET —
+ * both of those paths therefore require ADMIN_SECRET. Legacy HMAC-constant
+ * cookies from older sessions are still accepted as PIN sessions.
  *
  * Edge-runtime safe: baseline content comes from a build-time manifest (no
  * fs) and edits persist via the GitHub API, so this runs unchanged on
@@ -22,18 +29,31 @@
 import { cookies } from 'next/headers';
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { getDocSource, listDocSlugs } from './content';
+import { ssoEnabled, verifySsoToken, SSO_JWT_COOKIE } from './docsdev-sso';
 
 const COOKIE = 'docsdev_admin';
-const ADMIN_PIN = process.env.ADMIN_PIN ?? '1234';
-const ADMIN_SECRET = process.env.ADMIN_SECRET ?? 'docs-dev-poc-secret';
+const ADMIN_PIN = process.env.ADMIN_PIN || null;
+const ADMIN_SECRET = process.env.ADMIN_SECRET || null;
+
+/** Whether standalone PIN login is usable at all — both secrets must be set. */
+export function pinAuthConfigured(): boolean {
+  return ADMIN_PIN !== null && ADMIN_SECRET !== null;
+}
+
+/** Sealed (PIN/GitHub) sessions need the sealing key. */
+export function sealedSessionsConfigured(): boolean {
+  return ADMIN_SECRET !== null;
+}
 
 export type Session = {
-  method: 'pin' | 'github';
-  /** Stable identifier: GitHub login, or 'admin' for PIN sessions. */
+  method: 'pin' | 'github' | 'docsdev';
+  /** Stable identifier: GitHub login, email for docs.dev, or 'admin' for PIN. */
   login: string;
   /** Display name shown to teammates. */
   name: string;
   avatar?: string;
+  /** docs.dev team role (only for method: 'docsdev'). PIN/GitHub imply admin. */
+  role?: 'admin' | 'editor';
   /** GitHub App user access token (only for method: 'github'). */
   ghToken?: string;
   /** Epoch ms when ghToken expires. */
@@ -44,6 +64,9 @@ export type Session = {
 };
 
 function key(): Buffer {
+  if (!ADMIN_SECRET) {
+    throw new Error('ADMIN_SECRET must be set to use PIN or GitHub sign-in sessions.');
+  }
   return createHash('sha256').update(ADMIN_SECRET).digest();
 }
 
@@ -75,8 +98,9 @@ export function sealSession(session: Session): string {
 }
 
 export function openSession(value: string): Session | null {
+  if (!sealedSessionsConfigured()) return null;
   // Legacy cookie: the bare HMAC constant → a PIN session.
-  if (safeEqual(value, sessionToken())) {
+  if (pinAuthConfigured() && safeEqual(value, sessionToken())) {
     return { method: 'pin', login: 'admin', name: 'Admin', exp: Date.now() + 60_000 };
   }
   const session = openBox<Session>(value);
@@ -85,7 +109,12 @@ export function openSession(value: string): Session | null {
 }
 
 export function sessionToken(): string {
-  return createHmac('sha256', ADMIN_SECRET).update('admin-v1').digest('hex');
+  if (!ADMIN_PIN || !ADMIN_SECRET) {
+    throw new Error('ADMIN_PIN and ADMIN_SECRET must both be set to use standalone PIN login.');
+  }
+  // Bind the token to the PIN, not just the secret, so leaking one alone
+  // (e.g. a copy-pasted ADMIN_SECRET) doesn't yield a forgeable cookie.
+  return createHmac('sha256', ADMIN_SECRET).update(`admin-v1:${ADMIN_PIN}`).digest('hex');
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -96,14 +125,35 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 export function checkPin(pin: string): boolean {
+  if (!ADMIN_PIN) return false; // fail closed — no default to fall back to
   return safeEqual(pin, ADMIN_PIN);
 }
 
 export const SESSION_COOKIE = COOKIE;
 export const SESSION_MAX_AGE_S = 60 * 60 * 8;
 
+/**
+ * The signed-in editor session, whatever the sign-in method. With docs.dev
+ * SSO configured, this is the only path — the JWT in its own cookie is mapped
+ * into the shared Session shape so drafts/publish/presence work unchanged
+ * (no ghToken → publishing falls back to the server GITHUB_PAT).
+ */
 export async function readSession(): Promise<Session | null> {
   const store = await cookies();
+  if (ssoEnabled()) {
+    const token = store.get(SSO_JWT_COOKIE)?.value;
+    if (!token) return null;
+    const sso = await verifySsoToken(token);
+    if (!sso) return null;
+    return {
+      method: 'docsdev',
+      login: sso.email,
+      name: sso.email.split('@')[0] || sso.email,
+      role: sso.role,
+      exp: Date.now() + SESSION_MAX_AGE_S * 1000, // real expiry enforced by the JWT itself
+    };
+  }
+  if (!sealedSessionsConfigured()) return null; // nothing to authenticate against
   const value = store.get(COOKIE)?.value;
   if (!value) return null;
   return openSession(value);

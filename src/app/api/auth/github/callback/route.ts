@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { openBox, sealSession, SESSION_COOKIE, SESSION_MAX_AGE_S, type Session } from '@/lib/admin';
 import { exchangeCode, fetchIdentity, hasPushAccess } from '@/lib/github-auth';
+import { ssoEnabled } from '@/lib/docsdev-sso';
 
 type OAuthState = { n: string; returnTo: string; exp: number };
 
@@ -13,6 +14,11 @@ type OAuthState = { n: string; returnTo: string; exp: number };
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const fail = (reason: string) => NextResponse.redirect(new URL(`/admin?error=${encodeURIComponent(reason)}`, url.origin));
+
+  // Same rule as the login route: docs.dev SSO configured → SSO only.
+  if (ssoEnabled()) {
+    return NextResponse.redirect(new URL('/admin', url.origin));
+  }
 
   const code = url.searchParams.get('code');
   const stateRaw = url.searchParams.get('state');

@@ -2,6 +2,14 @@
 
 **Documentation that reads like a designed page, not a stack of blocks.**
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/keyboard-dev/docs.dev)
+
+One click clones this repo into **your** GitHub account, deploys it to **your**
+Cloudflare account, and wires up push-to-deploy CI (Workers Builds). From there
+the repo is yours: edit it by hand, in the GitHub UI, or point
+[Claude Code](https://claude.com/claude-code) at it — the repo ships a
+`CLAUDE.md` and skills so an agent is productive immediately.
+
 docs.dev is a documentation framework built on [Fumadocs](https://fumadocs.dev)
 (Next.js + MDX) with one thing no other docs tool has: a reading experience
 powered by [pretext](https://github.com/chenglou/pretext), chenglou's
@@ -56,7 +64,22 @@ pnpm dev        # http://localhost:3000
 
 ## Deploy
 
-### Cloudflare Workers (primary)
+### One-click (recommended)
+
+Click the **Deploy to Cloudflare** button at the top of this README. Cloudflare
+will:
+
+1. clone this template into a new repository in your GitHub/GitLab account,
+2. build it with Workers Builds and deploy it to your Cloudflare account
+   (live at `<worker-name>.<your-subdomain>.workers.dev`, or a custom domain
+   you attach later), and
+3. redeploy automatically on every push to your new repo's default branch.
+
+After deploying, update `GITHUB_OWNER` / `GITHUB_REPO` in `wrangler.jsonc` to
+point at *your* new repository if you want the optional `/admin` web editor to
+publish (it commits via the GitHub API using your `GITHUB_PAT` secret).
+
+### Cloudflare Workers (manual)
 
 Runs on Workers via [OpenNext](https://opennext.js.org/cloudflare). No
 filesystem is used at runtime — baseline content comes from a build-time
@@ -73,8 +96,16 @@ Set runtime secrets (not committed):
 
 ```bash
 wrangler secret put GITHUB_PAT      # token with contents:write — required to publish
-wrangler secret put ADMIN_PIN       # optional, defaults to 1234
+wrangler secret put ADMIN_PIN       # required for standalone /admin login (no default — see below)
+wrangler secret put ADMIN_SECRET    # required alongside ADMIN_PIN — any long random string
 ```
+
+> Both `ADMIN_PIN` and `ADMIN_SECRET` are required to use the standalone
+> `/admin` login. There is no built-in default — this repo is public, so a
+> hardcoded fallback would be a published constant, not a secret. Without
+> both set, `/admin` reports no login is configured until you set them, or
+> switch to team sign-in by setting `DOCSDEV_SITE_ID` (from your docs.dev
+> dashboard) in `wrangler.jsonc` — see `src/lib/docsdev-sso.ts`.
 
 `GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_BRANCH` are non-secret `vars` in
 `wrangler.jsonc`. The public docs need no env vars; the variables only power

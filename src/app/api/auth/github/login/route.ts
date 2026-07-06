@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sealBox, sealSession, SESSION_COOKIE, SESSION_MAX_AGE_S, type Session } from '@/lib/admin';
 import { authorizeUrl, githubOAuthConfigured, githubOAuthMocked } from '@/lib/github-auth';
+import { ssoEnabled } from '@/lib/docsdev-sso';
 
 /**
  * Starts the GitHub sign-in. `?return=/docs/...` is where to land afterwards
@@ -15,6 +16,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const back = url.searchParams.get('return') ?? '/docs';
   const returnTo = back.startsWith('/') && !back.startsWith('//') ? back : '/docs';
+
+  // With docs.dev sign-in configured it is the only method — GitHub App
+  // OAuth must not bypass team membership.
+  if (ssoEnabled()) {
+    return NextResponse.redirect(new URL('/admin', url.origin));
+  }
 
   if (!githubOAuthConfigured()) {
     return NextResponse.redirect(new URL('/admin?error=github-not-configured', url.origin));

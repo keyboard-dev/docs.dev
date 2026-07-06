@@ -1,12 +1,16 @@
 {
-  "title": "Documentation",
   "pages": [
     "---Get started---",
     "index",
-    "---Writing---",
-    "reading-experience",
-    "test",
+    "getting-started",
+    "---Editing---",
+    "editing",
+    "ai",
+    "---Access---",
+    "team",
+    "standalone-auth",
     "---Reference---",
+    "configuration",
     "api-reference"
   ]
 }

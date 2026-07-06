@@ -1,0 +1,63 @@
+---
+title: Standalone sign-in
+description: Run without a docs.dev account — GitHub sign-in for your repo's collaborators, or a simple PIN.
+---
+
+Don't want another account? Your site's editor also works fully standalone,
+with two methods you can enable independently. (If you later set up
+[team sign-in](/docs/team), it takes over as the only method.)
+
+## GitHub sign-in
+
+Editors sign in with GitHub; authorization is **push access to your docs
+repo** — if someone can push, they can edit, and their publishes are
+committed *as them* in git history.
+
+Set it up once:
+
+1. Create a **GitHub App** (Settings → Developer settings → GitHub Apps) with
+   the callback URL:
+
+   ```
+   https://<your-site>/api/auth/github/callback
+   ```
+
+2. Enable **"Request user authorization (OAuth) during installation"** and
+   install the app on your docs repo.
+3. Set two secrets on your Worker:
+
+   ```bash
+   wrangler secret put GITHUB_APP_CLIENT_ID
+   wrangler secret put GITHUB_APP_CLIENT_SECRET
+   ```
+
+That's it — `/admin` now shows **Sign in with GitHub**.
+
+## PIN sign-in
+
+The lightweight option for solo sites and local development: one shared PIN.
+
+```bash
+wrangler secret put ADMIN_PIN       # the PIN editors type
+wrangler secret put ADMIN_SECRET    # any long random string (session sealing key)
+```
+
+Both are required — there is **no default PIN**. This template is public
+code, so a baked-in fallback would be a published constant, not a secret; an
+unconfigured deployment simply has editing disabled until you set these.
+
+<Callout title="Which should I use?">
+  GitHub sign-in for anything with more than one editor — real identity, per
+  person revocation, commit attribution. PIN for a personal site or a quick
+  demo. Both at once is fine: the sign-in screen offers whatever is
+  configured.
+</Callout>
+
+## Publishing credential
+
+Publishes from GitHub-signed-in editors use their own token. PIN sessions
+(and the shared-drafts store) need a server credential:
+
+```bash
+wrangler secret put GITHUB_PAT      # fine-grained token, contents: read/write on the docs repo
+```

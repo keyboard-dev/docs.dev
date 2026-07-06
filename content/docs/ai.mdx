@@ -1,0 +1,63 @@
+---
+title: AI writing & images
+description: Generate docs and images in the editor — running on your own Cloudflare account, no API keys required.
+---
+
+The editor can draft documentation and generate images for you. Both run on
+[Workers AI](https://developers.cloudflare.com/workers-ai/) — meaning they
+execute on **your** Cloudflare account, are billed to you (the free tier goes
+a long way for docs), and require no API keys from anyone. It works the
+moment your site deploys.
+
+## Writing with AI
+
+In the editor, **Generate with AI** drafts content from a prompt, aware of
+the page you're on (title and surrounding context), and returns Markdown that
+drops straight into your blocks — headings, code fences, lists intact. You
+review and edit before anything is published; AI output is a draft like any
+other.
+
+### Grounding with web search (optional)
+
+For topics that benefit from current sources, generation can ground itself
+with a web search first and cite what it found. Enable it by setting one
+secret — either provider works:
+
+```bash
+wrangler secret put TAVILY_API_KEY   # tavily.com
+# or
+wrangler secret put BRAVE_API_KEY    # brave.com/search/api
+```
+
+Without a key, generation still works — it just skips the search step.
+
+## Image generation
+
+<Spread image="/uploads/pebble-paperweight.webp" alt="AI-generated illustration of a terracotta pebble with dashed lines flowing around it" side="left" width="32%" caption="Generated from a prompt, placed as a figure — the prose flows around it.">
+**Generate image** turns a prompt into an illustration you can place like any
+uploaded image — including as a figure that prose flows around, exactly like
+this one. Generated images ride the same pipeline as uploads: they save into
+your draft, publish as a git commit to `public/uploads/`, and are served as
+static assets by your own site.
+</Spread>
+
+## Choosing models
+
+Sensible defaults ship out of the box, overridable with two variables in
+`wrangler.jsonc`:
+
+| Variable | Default |
+| --- | --- |
+| `AI_TEXT_MODEL` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` |
+| `AI_IMAGE_MODEL` | `@cf/black-forest-labs/flux-1-schnell` |
+
+Any text or image model in the
+[Workers AI catalog](https://developers.cloudflare.com/workers-ai/models/)
+works.
+
+<Callout title="Why on-your-account AI matters">
+  Your prompts and your docs never route through a third party's metering
+  proxy, there's no per-seat AI fee, and rate limits are yours alone. It's
+  the same principle as the rest of docs.dev: the tool is ours, the
+  infrastructure is yours.
+</Callout>
