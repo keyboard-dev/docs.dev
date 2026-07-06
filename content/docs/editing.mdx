@@ -45,6 +45,16 @@ in about a minute. Depending on how you signed in:
 Because published pages are just MDX in git, everything you already do with
 code applies to docs: branches, pull requests, reviews, reverts.
 
+## Theming from the sidebar
+
+Admins get a **Theme…** entry at the bottom of the sidebar. Pick a preset
+accent or dial in a custom color, and the whole site updates instantly —
+links, buttons, figure accents, editor chrome, even the draft you're in the
+middle of editing — so you can judge the color in context, not in a settings
+page. The preview is local to you until you hit **Publish**, which commits
+`src/app/theme.css` to your repo like any other edit; push-to-deploy CI
+rebuilds the site with the new accent for everyone.
+
 ## Editing with Claude Code
 
 The repo is agent-ready: `CLAUDE.md` teaches the conventions (where pages

@@ -2,6 +2,7 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-openapi/css/preset.css';
+@import './theme.css';
 
 /* ------------------------------------------------------------------ */
 /* fonts (self-hosted, no build-time or runtime Google requests)       */
@@ -62,9 +63,8 @@
 }
 
 :root {
-  /* Brand accent used by the editor UI (bars, buttons, links, the orb).
-     Override this one variable to rebrand docs.dev for your site. */
-  --docsdev-accent: #c2571f;
+  /* The brand accent (--docsdev-accent) lives in theme.css — edit it there
+     or through the admin sidebar's "Theme…" picker. */
 
   /* Brand type: pixel display headings, Geist body, Geist Mono meta.
      Code blocks keep the default mono stack (--font-meta is NOT the

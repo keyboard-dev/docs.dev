@@ -37,14 +37,45 @@ That's it — `/admin` now shows **Sign in with GitHub**.
 
 The lightweight option for solo sites and local development: one shared PIN.
 
+### Set the PIN
+
+Set two secrets on your Worker — you'll be prompted for each value:
+
 ```bash
-wrangler secret put ADMIN_PIN       # the PIN editors type
-wrangler secret put ADMIN_SECRET    # any long random string (session sealing key)
+wrangler secret put ADMIN_PIN       # the PIN editors type at /admin
+wrangler secret put ADMIN_SECRET    # long random string that seals session cookies
+```
+
+Pick any PIN you like; for the sealing key, generate something strong:
+
+```bash
+openssl rand -base64 32
 ```
 
 Both are required — there is **no default PIN**. This template is public
 code, so a baked-in fallback would be a published constant, not a secret; an
 unconfigured deployment simply has editing disabled until you set these.
+
+Once set, visit `/admin` (or the **Edit page** button on any page after
+signing in) and enter the PIN. Sessions last 8 hours.
+
+### Local development
+
+Secrets aren't available to `pnpm dev`, so put them in a `.dev.vars` file at
+the repo root (it's gitignored — never commit it):
+
+```bash title=".dev.vars"
+ADMIN_PIN=1234
+ADMIN_SECRET=any-long-random-string-for-local-work
+```
+
+### Rotating
+
+- **Change the PIN:** run `wrangler secret put ADMIN_PIN` again. Existing
+  sessions stay valid until they expire (8 hours); only new sign-ins need
+  the new PIN.
+- **Sign everyone out now:** rotate `ADMIN_SECRET`. Session cookies are
+  sealed with it, so changing it invalidates every session immediately.
 
 <Callout title="Which should I use?">
   GitHub sign-in for anything with more than one editor — real identity, per

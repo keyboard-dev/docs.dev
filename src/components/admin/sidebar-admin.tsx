@@ -16,11 +16,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
-import { FilePlus2, Files, Trash2, X } from 'lucide-react';
+import { Check, FilePlus2, Files, Palette, Trash2, X } from 'lucide-react';
 import { putDraft, deleteDraft } from '@/lib/drafts';
 import { editorName, listServerDrafts, primeEditorName, pushServerDraft, deleteServerDraft } from '@/lib/draft-sync';
 
 const ACCENT = 'var(--docsdev-accent, #c2571f)';
+
+/* Theme picker: the accent previews live via the CSS variable (drafts and the
+   editor pick it up instantly) and persists locally until published. */
+const ACCENT_PRESETS = ['#c2571f', '#b91c1c', '#b45309', '#15803d', '#0f766e', '#1d4ed8', '#7c3aed', '#be185d'];
+const ACCENT_PREVIEW_KEY = 'docsdev-accent-preview';
+
+function currentAccent(): string {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--docsdev-accent').trim();
+  return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : '#c2571f';
+}
 
 function slugify(text: string): string {
   return text
@@ -43,6 +53,57 @@ export function SidebarAdmin() {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const injected = useRef<HTMLElement[]>([]);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const [accent, setAccent] = useState('#c2571f');
+  const [themeNote, setThemeNote] = useState('');
+  const [publishingTheme, setPublishingTheme] = useState(false);
+
+  // Re-apply a locally previewed (unpublished) accent for admins on load.
+  useEffect(() => {
+    if (!admin) return;
+    const saved = localStorage.getItem(ACCENT_PREVIEW_KEY);
+    if (saved && /^#[0-9a-fA-F]{6}$/.test(saved)) {
+      document.documentElement.style.setProperty('--docsdev-accent', saved);
+    }
+    queueMicrotask(() => setAccent(saved && /^#[0-9a-fA-F]{6}$/.test(saved) ? saved.toLowerCase() : currentAccent()));
+  }, [admin]);
+
+  const applyAccent = useCallback((hex: string) => {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+    setAccent(hex.toLowerCase());
+    document.documentElement.style.setProperty('--docsdev-accent', hex.toLowerCase());
+    localStorage.setItem(ACCENT_PREVIEW_KEY, hex.toLowerCase());
+    setThemeNote('Previewing — only you see this until you publish.');
+  }, []);
+
+  const resetAccent = useCallback(() => {
+    localStorage.removeItem(ACCENT_PREVIEW_KEY);
+    document.documentElement.style.removeProperty('--docsdev-accent');
+    setThemeNote('');
+    queueMicrotask(() => setAccent(currentAccent()));
+  }, []);
+
+  const publishTheme = useCallback(async () => {
+    setPublishingTheme(true);
+    setThemeNote('Publishing…');
+    try {
+      const res = await fetch('/api/admin/theme', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ accent }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      setThemeNote(
+        res.ok
+          ? 'Committed — the site rebuilds with this accent; your preview stays on meanwhile.'
+          : (data.error ?? 'Publish failed.'),
+      );
+    } catch (err) {
+      setThemeNote(`Publish failed: ${(err as Error).message}`);
+    } finally {
+      setPublishingTheme(false);
+    }
+  }, [accent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,26 +231,141 @@ export function SidebarAdmin() {
     <>
       {host &&
         createPortal(
-          <button
-            onClick={() => {
-              setNote('');
-              setOpen((o) => !o);
-              void refresh();
-            }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px',
-              marginTop: 4, border: 'none', borderRadius: 8, background: 'transparent',
-              color: 'var(--color-fd-muted-foreground)', fontSize: 13.5, fontWeight: 500,
-              cursor: 'pointer', textAlign: 'left',
-              fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          >
-            <Files size={14} /> Pages…
-          </button>,
+          <>
+            <button
+              onClick={() => {
+                setNote('');
+                setThemeOpen(false);
+                setOpen((o) => !o);
+                void refresh();
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px',
+                marginTop: 4, border: 'none', borderRadius: 8, background: 'transparent',
+                color: 'var(--color-fd-muted-foreground)', fontSize: 13.5, fontWeight: 500,
+                cursor: 'pointer', textAlign: 'left',
+                fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <Files size={14} /> Pages…
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                setThemeOpen((o) => !o);
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px',
+                border: 'none', borderRadius: 8, background: 'transparent',
+                color: 'var(--color-fd-muted-foreground)', fontSize: 13.5, fontWeight: 500,
+                cursor: 'pointer', textAlign: 'left',
+                fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <Palette size={14} style={{ color: ACCENT }} /> Theme…
+            </button>
+          </>,
           host,
         )}
+
+      {themeOpen && (
+        <div
+          className="dd-pop"
+          style={{
+            position: 'fixed', left: 16, bottom: 64, zIndex: 95, width: 300,
+            display: 'flex', flexDirection: 'column',
+            fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--color-fd-border)' }}>
+            <strong style={{ fontSize: 13.5, flex: 1 }}>Theme</strong>
+            <button onClick={() => setThemeOpen(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-fd-muted-foreground)', display: 'flex' }}>
+              <X size={14} />
+            </button>
+          </div>
+
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 12, color: 'var(--color-fd-muted-foreground)' }}>
+              Accent color — applies instantly, everywhere, including open drafts.
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {ACCENT_PRESETS.map((hex) => (
+                <button
+                  key={hex}
+                  title={hex}
+                  onClick={() => applyAccent(hex)}
+                  style={{
+                    width: 28, height: 28, borderRadius: 8, background: hex, cursor: 'pointer',
+                    border: accent === hex ? '2px solid var(--color-fd-foreground)' : '1px solid var(--color-fd-border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+                  }}
+                >
+                  {accent === hex && <Check size={13} />}
+                </button>
+              ))}
+              <label
+                title="Custom color"
+                style={{
+                  width: 28, height: 28, borderRadius: 8, cursor: 'pointer', overflow: 'hidden',
+                  border: '1px dashed var(--color-fd-border)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'conic-gradient(#ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444)',
+                }}
+              >
+                <input
+                  type="color"
+                  value={accent}
+                  onChange={(e) => applyAccent(e.target.value)}
+                  style={{ opacity: 0, width: 0, height: 0, border: 'none', padding: 0 }}
+                />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                value={accent}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  if (/^#[0-9a-fA-F]{6}$/.test(v)) applyAccent(v);
+                  else setAccent(v);
+                }}
+                spellCheck={false}
+                style={{
+                  width: 90, height: 28, border: '1px solid var(--color-fd-border)', borderRadius: 8,
+                  background: 'transparent', color: 'var(--color-fd-foreground)', fontSize: 12.5,
+                  fontFamily: 'var(--font-meta, ui-monospace, monospace)', padding: '0 8px', outline: 'none',
+                }}
+              />
+              <span style={{ width: 20, height: 20, borderRadius: 6, background: ACCENT, border: '1px solid var(--color-fd-border)' }} />
+              <span style={{ flex: 1 }} />
+              <button
+                onClick={resetAccent}
+                style={{ height: 28, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-fd-border)', background: 'transparent', color: 'var(--color-fd-muted-foreground)', fontSize: 12, cursor: 'pointer' }}
+              >
+                Reset
+              </button>
+              <button
+                onClick={() => void publishTheme()}
+                disabled={publishingTheme || !/^#[0-9a-fA-F]{6}$/.test(accent)}
+                style={{
+                  height: 28, padding: '0 12px', borderRadius: 8, border: 'none', background: ACCENT,
+                  color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer', opacity: publishingTheme ? 0.6 : 1,
+                }}
+              >
+                Publish
+              </button>
+            </div>
+          </div>
+
+          {themeNote && (
+            <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-fd-border)', fontSize: 12, color: 'var(--color-fd-muted-foreground)' }}>
+              {themeNote}
+            </div>
+          )}
+        </div>
+      )}
 
       {open && (
         <div
