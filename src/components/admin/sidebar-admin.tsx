@@ -19,17 +19,58 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Check, FilePlus2, Files, Palette, Trash2, X } from 'lucide-react';
 import { putDraft, deleteDraft } from '@/lib/drafts';
 import { editorName, listServerDrafts, primeEditorName, pushServerDraft, deleteServerDraft } from '@/lib/draft-sync';
+import { HEADING_STYLES, HEADING_VARS, headingVars, type HeadingStyle } from '@/lib/theme-presets';
 
 const ACCENT = 'var(--docsdev-accent, #c2571f)';
 
-/* Theme picker: the accent previews live via the CSS variable (drafts and the
-   editor pick it up instantly) and persists locally until published. */
+/* Theme picker: accent + heading style preview live via CSS variables (drafts
+   and the editor pick them up instantly) and persist locally until published. */
 const ACCENT_PRESETS = ['#c2571f', '#b91c1c', '#b45309', '#15803d', '#0f766e', '#1d4ed8', '#7c3aed', '#be185d'];
 const ACCENT_PREVIEW_KEY = 'docsdev-accent-preview';
+const HEADING_PREVIEW_KEY = 'docsdev-heading-preview';
 
 function currentAccent(): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue('--docsdev-accent').trim();
   return /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : '#c2571f';
+}
+
+/** Infer the currently-effective heading style from the CSS variables the
+ *  published theme.css (or a live preview) set on :root. */
+function currentHeadingStyle(): HeadingStyle {
+  const cs = getComputedStyle(document.documentElement);
+  const get = (name: string) => cs.getPropertyValue(name).trim();
+  if (get('--docsdev-h2-marker-h')) return 'marker';
+  if (get('--docsdev-h2-rule-w')) return 'underline';
+  if (get('--docsdev-h2-color')) return 'tinted';
+  return 'classic';
+}
+
+function setHeadingVarsOnRoot(style: HeadingStyle) {
+  const root = document.documentElement.style;
+  for (const v of HEADING_VARS) root.removeProperty(v);
+  for (const [k, v] of Object.entries(headingVars(style))) root.setProperty(k, v);
+}
+
+/** Tiny "Aa" swatch previewing one heading style in the picker. */
+function HeadingSwatch({ style }: { style: HeadingStyle }) {
+  const base: React.CSSProperties = { fontFamily: 'var(--font-pixel, inherit)', fontSize: 15, lineHeight: 1 };
+  switch (style) {
+    case 'tinted':
+      return <span style={{ ...base, color: ACCENT }}>Aa</span>;
+    case 'underline':
+      return (
+        <span style={{ ...base, paddingBottom: 3, borderBottom: `1px solid color-mix(in srgb, ${ACCENT} 55%, transparent)` }}>Aa</span>
+      );
+    case 'marker':
+      return (
+        <span style={{ ...base, display: 'inline-flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+          Aa
+          <span style={{ width: 16, height: 3, borderRadius: 99, background: ACCENT }} />
+        </span>
+      );
+    default:
+      return <span style={base}>Aa</span>;
+  }
 }
 
 function slugify(text: string): string {
@@ -55,17 +96,25 @@ export function SidebarAdmin() {
   const injected = useRef<HTMLElement[]>([]);
   const [themeOpen, setThemeOpen] = useState(false);
   const [accent, setAccent] = useState('#c2571f');
+  const [headingStyle, setHeadingStyle] = useState<HeadingStyle>('classic');
   const [themeNote, setThemeNote] = useState('');
   const [publishingTheme, setPublishingTheme] = useState(false);
 
-  // Re-apply a locally previewed (unpublished) accent for admins on load.
+  // Re-apply locally previewed (unpublished) theme choices for admins on load.
   useEffect(() => {
     if (!admin) return;
     const saved = localStorage.getItem(ACCENT_PREVIEW_KEY);
     if (saved && /^#[0-9a-fA-F]{6}$/.test(saved)) {
       document.documentElement.style.setProperty('--docsdev-accent', saved);
     }
-    queueMicrotask(() => setAccent(saved && /^#[0-9a-fA-F]{6}$/.test(saved) ? saved.toLowerCase() : currentAccent()));
+    const savedHeading = localStorage.getItem(HEADING_PREVIEW_KEY) as HeadingStyle | null;
+    if (savedHeading && HEADING_STYLES.some((s) => s.id === savedHeading)) {
+      setHeadingVarsOnRoot(savedHeading);
+    }
+    queueMicrotask(() => {
+      setAccent(saved && /^#[0-9a-fA-F]{6}$/.test(saved) ? saved.toLowerCase() : currentAccent());
+      setHeadingStyle(savedHeading && HEADING_STYLES.some((s) => s.id === savedHeading) ? savedHeading : currentHeadingStyle());
+    });
   }, [admin]);
 
   const applyAccent = useCallback((hex: string) => {
@@ -76,11 +125,23 @@ export function SidebarAdmin() {
     setThemeNote('Previewing — only you see this until you publish.');
   }, []);
 
-  const resetAccent = useCallback(() => {
+  const applyHeadingStyle = useCallback((style: HeadingStyle) => {
+    setHeadingStyle(style);
+    setHeadingVarsOnRoot(style);
+    localStorage.setItem(HEADING_PREVIEW_KEY, style);
+    setThemeNote('Previewing — only you see this until you publish.');
+  }, []);
+
+  const resetTheme = useCallback(() => {
     localStorage.removeItem(ACCENT_PREVIEW_KEY);
+    localStorage.removeItem(HEADING_PREVIEW_KEY);
     document.documentElement.style.removeProperty('--docsdev-accent');
+    for (const v of HEADING_VARS) document.documentElement.style.removeProperty(v);
     setThemeNote('');
-    queueMicrotask(() => setAccent(currentAccent()));
+    queueMicrotask(() => {
+      setAccent(currentAccent());
+      setHeadingStyle(currentHeadingStyle());
+    });
   }, []);
 
   const publishTheme = useCallback(async () => {
@@ -90,7 +151,7 @@ export function SidebarAdmin() {
       const res = await fetch('/api/admin/theme', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ accent }),
+        body: JSON.stringify({ accent, headingStyle }),
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       setThemeNote(
@@ -103,7 +164,7 @@ export function SidebarAdmin() {
     } finally {
       setPublishingTheme(false);
     }
-  }, [accent]);
+  }, [accent, headingStyle]);
 
   useEffect(() => {
     let cancelled = false;
@@ -323,6 +384,28 @@ export function SidebarAdmin() {
                 />
               </label>
             </div>
+            <div style={{ fontSize: 12, color: 'var(--color-fd-muted-foreground)', marginTop: 4 }}>
+              Headings — how section headers and subheaders wear the accent.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {HEADING_STYLES.map((s) => (
+                <button
+                  key={s.id}
+                  title={s.blurb}
+                  onClick={() => applyHeadingStyle(s.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 10,
+                    cursor: 'pointer', background: 'transparent', textAlign: 'left',
+                    border: headingStyle === s.id ? `1.5px solid ${ACCENT}` : '1px solid var(--color-fd-border)',
+                  }}
+                >
+                  <HeadingSwatch style={s.id} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: headingStyle === s.id ? 'var(--color-fd-foreground)' : 'var(--color-fd-muted-foreground)' }}>
+                    {s.label}
+                  </span>
+                </button>
+              ))}
+            </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input
                 value={accent}
@@ -341,7 +424,7 @@ export function SidebarAdmin() {
               <span style={{ width: 20, height: 20, borderRadius: 6, background: ACCENT, border: '1px solid var(--color-fd-border)' }} />
               <span style={{ flex: 1 }} />
               <button
-                onClick={resetAccent}
+                onClick={resetTheme}
                 style={{ height: 28, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-fd-border)', background: 'transparent', color: 'var(--color-fd-muted-foreground)', fontSize: 12, cursor: 'pointer' }}
               >
                 Reset

@@ -50,6 +50,7 @@ import {
   List,
   ListOrdered,
   Lock,
+  LockOpen,
   Minus,
   Plus,
   Quote as QuoteIcon,
@@ -111,6 +112,9 @@ function setMetaLine(fm: string, key: string, val: string): string {
   if (new RegExp(`^${key}:`, 'm').test(fm)) return fm.replace(new RegExp(`^${key}:.*$`, 'm'), `${key}: ${val}`);
   if (/\n---\n?$/.test(fm)) return fm.replace(/\n---\n?$/, `\n${key}: ${val}\n---\n`);
   return `---\n${key}: ${val}\n---\n`;
+}
+function removeMetaLine(fm: string, key: string): string {
+  return fm.replace(new RegExp(`^${key}:.*$\\n?`, 'm'), '');
 }
 
 /** Place the caret inside `el` at start/end/char offset. */
@@ -1187,6 +1191,15 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     setFrontmatter(fm);
     emit({ frontmatter: fm, blocks: stateRef.current.blocks });
   };
+  /** Reading-PIN protection rides in frontmatter as `protected: true`. */
+  const isProtected = metaLine(frontmatter, 'protected') === 'true';
+  const setProtected = (on: boolean) => {
+    const fm = on
+      ? setMetaLine(stateRef.current.frontmatter, 'protected', 'true')
+      : removeMetaLine(stateRef.current.frontmatter, 'protected');
+    setFrontmatter(fm);
+    emit({ frontmatter: fm, blocks: stateRef.current.blocks });
+  };
 
   function newBlock(type: string): Block {
     const id = newId();
@@ -1924,10 +1937,29 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
         {metaLine(frontmatter, 'description')}
       </p>
       {/* Ghost of the published page's copy-markdown row, so the content
-          below starts at exactly the same y as the real page. */}
-      <div className="flex flex-row gap-2 items-center border-b pb-6" aria-hidden style={{ pointerEvents: 'none' }}>
-        <div style={{ height: 30, width: 132, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5 }} />
-        <div style={{ height: 30, width: 74, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5 }} />
+          below starts at exactly the same y as the real page — plus the
+          reading-PIN lock toggle on the right. */}
+      <div className="flex flex-row gap-2 items-center border-b pb-6">
+        <div aria-hidden style={{ height: 30, width: 132, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5, pointerEvents: 'none' }} />
+        <div aria-hidden style={{ height: 30, width: 74, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5, pointerEvents: 'none' }} />
+        <span style={{ flex: 1 }} />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setProtected(!isProtected);
+          }}
+          title={
+            isProtected
+              ? 'Readers need the reading PIN to view this page (READER_PIN secret). Click to make it public again.'
+              : 'Require the reading PIN to view this page — share the PIN with users you trust, without opening the page to everyone.'
+          }
+          className="dd-chip-btn"
+          data-on={isProtected ? 'true' : undefined}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, border: '1px solid var(--color-fd-border)' }}
+        >
+          {isProtected ? <Lock size={11} /> : <LockOpen size={11} />}
+          {isProtected ? 'PIN-protected' : 'Protect'}
+        </button>
       </div>
 
       {/* Blocks are DIRECT children of the same .prose container the published

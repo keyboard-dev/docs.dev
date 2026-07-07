@@ -1,0 +1,65 @@
+---
+title: Protected pages
+description: Put individual pages behind a reading PIN — share docs with your users without publishing them to competitors.
+---
+
+Sometimes a page is for *your users*, not the whole internet: integration
+details, roadmap notes, pricing internals. Protected pages stay on your docs
+site with the same URL, sidebar entry, and layout — but the content only
+renders after the visitor enters a **reading PIN** you control. Hand the PIN
+to customers and partners; everyone else (competitors included) sees a lock
+screen.
+
+## Set the reading PIN
+
+The PIN is a site-wide secret, separate from the admin PIN — it grants
+*reading only*, never editing:
+
+```bash
+wrangler secret put READER_PIN
+```
+
+`ADMIN_SECRET` must also be set (it signs the unlock cookie — see
+[standalone auth](/docs/standalone-auth)). With `READER_PIN` unset, protected
+pages fail closed: only signed-in team members can read them.
+
+## Protect a page
+
+In the editor, use the **Protect** toggle next to the page title area — it
+marks the page and Publish commits the change. Or by hand, add one line of
+frontmatter:
+
+```mdx
+---
+title: Enterprise rollout guide
+description: For customers only.
+protected: true
+---
+```
+
+Signed-in admins and editors always see protected pages without a PIN.
+
+## What readers see
+
+The page keeps its title and description, but the body is replaced by a PIN
+prompt. A correct PIN sets a cookie that lasts 30 days in that browser, then
+the page renders normally. Changing `READER_PIN` (or `ADMIN_SECRET`)
+invalidates every unlocked browser at once — that's your revocation lever.
+
+## How it stays sealed
+
+A protected page isn't just hidden client-side:
+
+- Its **static build contains only the lock screen** — never the body. The
+  content is served exclusively by an API that verifies the reader cookie on
+  the server, so nothing confidential leaves your Worker without it.
+- It's **out of the search index** — findable by title, but its content is
+  never indexed.
+- It's **absent from `llms-full.txt` and the `/llms.mdx` markdown mirrors**,
+  the machine-readable exports agents use.
+
+<Callout title="What stays visible">
+  The page's title and description still appear in the sidebar, search
+  results, and the lock screen itself — pick them accordingly. The reading
+  PIN is one shared secret for the whole site, not per-page passwords.
+</Callout>

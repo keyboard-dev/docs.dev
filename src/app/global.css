@@ -126,6 +126,33 @@ article h1 + p.text-lg {
   text-wrap: balance;
 }
 
+/* Theme-driven heading treatments (see src/lib/theme-presets.ts). The
+   variables come from theme.css / the admin "Theme…" picker; when unset,
+   everything below collapses to the classic look. */
+.prose h2 {
+  position: relative;
+  color: var(--docsdev-h2-color, inherit);
+  /* room for the underline rule or the marker bar, whichever is active */
+  padding-bottom: max(var(--docsdev-h2-pad, 0px), calc(var(--docsdev-h2-marker-h, 0px) * 2.5));
+  border-bottom: var(--docsdev-h2-rule-w, 0) solid var(--docsdev-h2-rule-color, transparent);
+}
+.prose h3 {
+  color: var(--docsdev-h3-color, inherit);
+}
+/* "Marker" style: a short accent bar under H2s (zero-size when unset).
+   Absolutely positioned so it sits below the text whether the theme renders
+   headings as flex rows (anchor links) or plain blocks. */
+.prose h2::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--docsdev-h2-marker-w, 0);
+  height: var(--docsdev-h2-marker-h, 0);
+  border-radius: 999px;
+  background: var(--docsdev-accent, #c2571f);
+}
+
 /* The meta layer speaks Geist Mono: figure captions, sidebar section
    labels, and the table of contents. Code blocks are untouched — they
    keep the default code font stack. */

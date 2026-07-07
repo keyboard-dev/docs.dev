@@ -28,6 +28,11 @@
   //   GITHUB_APP_CLIENT_SECRET     register a GitHub App with callback URL
   //                                <site>/api/auth/github/callback, enable
   //                                user authorization, install on the repo)
+  //   READER_PIN                — reading PIN for pages marked
+  //                               `protected: true` (grants reading only —
+  //                               share it with users, not editors; requires
+  //                               ADMIN_SECRET; unset = protected pages stay
+  //                               locked to signed-in team members)
   //   TAVILY_API_KEY or BRAVE_API_KEY — optional web search grounding for
   //                                "Generate with AI" (skipped when unset)
   // Non-secret defaults can live here:

@@ -24,6 +24,7 @@ local development, put secrets in a `.dev.vars` file (never committed).
 | `GITHUB_PAT` | Publishing from PIN/docs.dev sessions and the shared-drafts store. Fine-grained token, `contents: read/write` on the docs repo. |
 | `ADMIN_PIN` + `ADMIN_SECRET` | [PIN sign-in](/docs/standalone-auth#pin-sign-in). Both required; no defaults — editing stays disabled without them. |
 | `GITHUB_APP_CLIENT_ID` + `GITHUB_APP_CLIENT_SECRET` | [GitHub sign-in](/docs/standalone-auth#github-sign-in). |
+| `READER_PIN` | Unlocking [protected pages](/docs/protected-pages). Reading only — safe to share with users. Requires `ADMIN_SECRET`. |
 | `TAVILY_API_KEY` *or* `BRAVE_API_KEY` | Optional [web-search grounding](/docs/ai#grounding-with-web-search-optional) for AI writing. |
 
 ## Sign-in precedence

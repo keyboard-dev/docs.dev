@@ -12,6 +12,8 @@ import { getMDXComponents } from '@/components/mdx';
 import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { gitConfig } from '@/lib/shared';
+import { isProtectedSlug } from '@/lib/protect';
+import { ProtectedContent } from '@/components/protected-content';
 import { DraftShellNotice } from '@/components/admin/draft-shell-notice';
 import { openapi } from '@/lib/openapi';
 import { OpenAPIPage } from '@/components/openapi-page';
@@ -43,6 +45,24 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
     );
   }
 
+  // Reading-PIN gate. A protected page prerenders as this lock shell — the
+  // content is never part of the static page; readers fetch it from
+  // /api/reader/content, which checks the reader cookie on the server.
+  // See src/lib/protect.ts.
+  const locked = isProtectedSlug(page.slugs);
+  if (locked) {
+    return (
+      <DocsPage toc={[]}>
+        <DocsTitle>{page.data.title}</DocsTitle>
+        <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
+        <div className="flex flex-row gap-2 items-center border-b pb-6" />
+        <DocsBody>
+          <ProtectedContent slug={page.slugs.join('/')} />
+        </DocsBody>
+      </DocsPage>
+    );
+  }
+
   const MDX = page.data.body;
   const markdownUrl = getPageMarkdownUrl(page).url;
 
@@ -56,11 +76,16 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
       <div className="flex flex-row gap-2 items-center border-b pb-6">
-        <MarkdownCopyButton markdownUrl={markdownUrl} />
-        <ViewOptionsPopover
-          markdownUrl={markdownUrl}
-          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${page.path}`}
-        />
+        {/* Protected pages have no public markdown mirror to link to. */}
+        {!locked && (
+          <>
+            <MarkdownCopyButton markdownUrl={markdownUrl} />
+            <ViewOptionsPopover
+              markdownUrl={markdownUrl}
+              githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${page.path}`}
+            />
+          </>
+        )}
       </div>
       <DocsBody data-api-page={apiProps ? '' : undefined}>
         <MDX

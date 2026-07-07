@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "title": "docs.dev — documentation that reads like a designed page",
+    "description": "Docs in a repo you own, on Cloudflare you control, with prose that flows around figures like a magazine — plus an editor your whole team can use."
+  },
+  "hero": {
+    "eyebrow": "Your repo · Your Cloudflare · Our reading experience",
+    "titleLines": ["Docs that read like a page,", "not a stack of blocks."],
+    "tagline": "docs.dev deploys a documentation site into your GitHub and your Cloudflare in one click — then gives your whole team an editor that works right on the page.",
+    "ctas": [
+      { "label": "Deploy to Cloudflare", "href": "https://deploy.workers.cloudflare.com/?url=https://github.com/keyboard-dev/docs.dev", "style": "primary" },
+      { "label": "Read the docs", "href": "/docs", "style": "outline" },
+      { "label": "GitHub ↗", "href": "https://github.com/keyboard-dev/docs.dev", "style": "text" }
+    ]
+  },
+  "demo": {
+    "intro": "This paragraph is live — select it. Every line here is laid out by pretext, a text-measurement engine that computes line breaks with pure arithmetic instead of asking the browser to reflow. Because the engine knows exactly how wide each line can be, it can narrow a line to slip past an obstacle and widen it again once the obstacle ends. The orb to the right is a layout obstacle, not a floated image hack — the text genuinely flows around its bounding box, line by line, the way a magazine sets type around a photograph. None of this touches getBoundingClientRect or paints text to a canvas. The words you are reading are ordinary, selectable, screen-reader-friendly DOM text; pretext only decided where each line should sit.",
+    "body": "Documentation is not just prose — it is prose interleaved with examples, diagrams, and asides, and in a conventional renderer each of those interrupts the reading flow. With a measurement-driven layout, the code sample sits in the margin while the explanation keeps flowing beside it, so your eye never leaves the paragraph to find the example it describes. The block on the left is exactly that: a real, syntax-highlighted sample pinned to the column edge with the text wrapping cleanly around it. Same Markdown you already write — rendered as a page someone actually wants to read.",
+    "code": "import { prepare,\n  layout } from\n  '@chenglou/pretext';\n\nconst t = prepare(\n  text, font);\nlayout(t, 640, 32);\n// → { lineCount, height }"
+  },
+  "features": {
+    "heading": "Everything yours. Nothing to migrate off of.",
+    "items": [
+      {
+        "title": "Your repo is the source of truth",
+        "body": "Every page is MDX in your GitHub repository. Publishing is a commit; reviews, branches, and rollbacks come for free.",
+        "href": "/docs/editing"
+      },
+      {
+        "title": "One click, your Cloudflare",
+        "body": "Deploy to your own Cloudflare account with push-to-deploy CI wired up. No hosting bill from us, no lock-in to escape.",
+        "href": "/docs/getting-started"
+      },
+      {
+        "title": "The editor is the page",
+        "body": "Edit in place with the exact layout readers see — shared drafts, live reflow around figures, publish with one button.",
+        "href": "/docs/editing"
+      },
+      {
+        "title": "AI on your account",
+        "body": "Draft docs and generate images with Workers AI, running and billed on your own Cloudflare account. No API keys.",
+        "href": "/docs/ai"
+      },
+      {
+        "title": "Team sign-in",
+        "body": "Invite teammates with docs.dev accounts — central membership, roles, and revocation. No shared credentials.",
+        "href": "/docs/team"
+      },
+      {
+        "title": "Built for agents",
+        "body": "Ships with CLAUDE.md and skills, so Claude Code can add pages, fix nav, and publish from a one-line request.",
+        "href": "/docs/getting-started#or-let-an-agent-do-it"
+      }
+    ]
+  },
+  "closing": {
+    "title": "Your docs, live in two minutes.",
+    "body": "One click clones the template into your GitHub, deploys to your Cloudflare, and wires up CI. This entire site is the template.",
+    "ctas": [
+      { "label": "Deploy to Cloudflare", "href": "https://deploy.workers.cloudflare.com/?url=https://github.com/keyboard-dev/docs.dev", "style": "primary" },
+      { "label": "Getting started", "href": "/docs/getting-started", "style": "outline" }
+    ]
+  }
+}
