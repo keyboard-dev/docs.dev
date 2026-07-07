@@ -26,6 +26,11 @@ export type LandingCopy = {
 
 export const landingCopy = copy as LandingCopy;
 
+/** Reserved slug the landing page's shared draft lives under in the drafts
+ *  store. Underscore-prefixed so it can never collide with a real docs page
+ *  (page slugs are `[a-z0-9-]`), and page lists filter `_`-prefixed slugs. */
+export const LANDING_DRAFT_SLUG = '_landing';
+
 const CTA_STYLES = new Set(['primary', 'outline', 'text']);
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 

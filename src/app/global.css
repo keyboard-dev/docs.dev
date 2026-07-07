@@ -345,7 +345,8 @@ article figcaption,
 }
 
 *:hover > .dd-langchip,
-.dd-langchip:focus {
+.dd-langchip:focus,
+.dd-langchip:focus-within {
   opacity: 1;
 }
 

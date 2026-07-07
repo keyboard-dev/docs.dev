@@ -206,7 +206,11 @@ export function SidebarAdmin() {
       listServerDrafts(),
     ]);
     const built: string[] = pagesRes.pages ?? [];
-    const draftOnly = drafts.filter((d) => !built.includes(d.slug.replace(/^\/+|\/+$/g, '') || 'index'));
+    // `_`-prefixed slugs are reserved (e.g. the landing page's shared draft)
+    // and are not docs pages.
+    const draftOnly = drafts.filter(
+      (d) => !d.slug.startsWith('_') && !built.includes(d.slug.replace(/^\/+|\/+$/g, '') || 'index'),
+    );
     setRows([
       ...built.map((slug) => ({ slug, draftOnly: false })),
       ...draftOnly.map((d) => ({ slug: d.slug || 'index', draftOnly: true, author: d.author })),
