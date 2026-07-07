@@ -1,21 +1,34 @@
 'use client';
 
 /**
- * The landing ("layout") page, rendered entirely from content/landing.json.
+ * The landing ("layout") page — a list of typed sections rendered from
+ * content/landing.json (see src/lib/landing.ts for the model).
  *
  * For visitors this is just the page. For admins it's the same unified
  * editing experience as docs pages: "Edit layout" turns the real page into
- * the editor — every heading, paragraph, button, and card is edited in
- * place with the exact classes readers see, drafts autosave locally and
- * sync to the shared drafts store (multiplayer, with conflict handling),
- * and Publish commits content/landing.json via /api/admin/layout. The
- * editing chrome itself lives in landing-editor.tsx.
+ * the editor — sections insert from templates, reorder, and delete in
+ * place; every text node is edited with the exact published classes; and
+ * flow figures drag, resize, and swap between orb / image / code with the
+ * prose reflowing live. The editing chrome lives in landing-editor.tsx.
  */
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Flow, type Obstacle } from '@/components/pretext/flow';
-import type { LandingCopy, LandingCta } from '@/lib/landing';
+import { DraftImage } from '@/components/draft-image';
+import {
+  FIGURE_GAP,
+  figureHeight,
+  type CtaSection,
+  type FeaturesSection,
+  type FlowFigure,
+  type FlowSection,
+  type HeroSection,
+  type LandingCopy,
+  type LandingCta,
+  type LandingSection,
+  type QuoteSection,
+} from '@/lib/landing';
 import { LandingEditOverlay, useLandingDraft } from './landing-editor';
 import { PencilRuler } from 'lucide-react';
 
@@ -45,8 +58,9 @@ function Cta({ cta }: { cta: LandingCta }) {
   );
 }
 
-export const ORB_BOX = { width: 220, height: 220, gap: 28 };
-export const CODE_BOX = { width: 300, height: 168, gap: 28 };
+/* ------------------------------------------------------------------ */
+/* figures                                                              */
+/* ------------------------------------------------------------------ */
 
 export function OrbNode() {
   return (
@@ -78,22 +92,160 @@ export const codePreStyle: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.08)',
 };
 
-export function orbObstacle(node?: React.ReactNode): Obstacle {
-  return { id: 'orb', side: 'right', top: 8, ...ORB_BOX, node: node ?? <OrbNode /> };
+/** The figure's visual, shared by the view and the editor. */
+export function FigureVisual({ figure }: { figure: FlowFigure }) {
+  switch (figure.kind) {
+    case 'orb':
+      return <OrbNode />;
+    case 'code':
+      return (
+        <pre style={codePreStyle}>
+          <code>{figure.code ?? ''}</code>
+        </pre>
+      );
+    default:
+      return figure.src ? (
+        <DraftImage
+          src={figure.src}
+          alt={figure.alt ?? ''}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12, display: 'block' }}
+        />
+      ) : (
+        <div
+          style={{
+            width: '100%', height: '100%', borderRadius: 12,
+            background: 'var(--color-fd-card)', border: '1px dashed var(--color-fd-border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--color-fd-muted-foreground)', fontSize: 13,
+          }}
+        >
+          Add an image
+        </div>
+      );
+  }
 }
 
-export function codeObstacle(code: string, node?: React.ReactNode): Obstacle {
+export function figureObstacle(figure: FlowFigure, node?: React.ReactNode): Obstacle {
   return {
-    id: 'code',
-    side: 'left',
-    top: 12,
-    ...CODE_BOX,
-    node: node ?? (
-      <pre style={codePreStyle}>
-        <code>{code}</code>
-      </pre>
-    ),
+    id: 'fig',
+    side: figure.side,
+    width: figure.width,
+    height: figureHeight(figure),
+    top: figure.top,
+    gap: FIGURE_GAP,
+    node: node ?? <FigureVisual figure={figure} />,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* section views — the registry                                         */
+/* ------------------------------------------------------------------ */
+
+/** Per-type vertical rhythm; the editor reuses these so edit mode has the
+ *  exact geometry of the published page. */
+export function sectionClass(type: LandingSection['type'], index: number): string {
+  switch (type) {
+    case 'hero':
+      return index === 0 ? 'pt-20' : 'mt-20';
+    case 'flow':
+      return 'mt-14';
+    case 'quote':
+      return 'mt-24';
+    case 'cta':
+      return 'mt-24';
+    default:
+      return 'mt-24';
+  }
+}
+
+function HeroView({ s }: { s: HeroSection }) {
+  return (
+    <>
+      <p className="mb-3 font-mono text-[13px] uppercase tracking-[0.14em] text-[var(--docsdev-accent,#e8753b)]">{s.eyebrow}</p>
+      <h1 className="m-0 text-[44px] font-extrabold leading-[1.05] tracking-[-0.02em] sm:text-[56px]">
+        {s.titleLines.map((line, i) => (
+          <span key={i}>
+            {i > 0 && <br />}
+            {line}
+          </span>
+        ))}
+      </h1>
+      <p className="mt-6 max-w-[560px] text-[17px] leading-relaxed text-fd-muted-foreground">{s.tagline}</p>
+      <div className="mt-8 flex flex-wrap items-center gap-3">
+        {s.ctas.map((cta, i) => (
+          <Cta key={i} cta={cta} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function FlowView({ s }: { s: FlowSection }) {
+  return <Flow text={s.text} obstacles={[figureObstacle(s.figure)]} />;
+}
+
+function FeaturesView({ s }: { s: FeaturesSection }) {
+  return (
+    <>
+      <h2 className="mb-8 text-[26px] font-bold tracking-[-0.01em]">{s.heading}</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {s.items.map((f, i) => (
+          <Link
+            key={i}
+            href={f.href || '/docs'}
+            className="rounded-2xl border border-fd-border p-5 no-underline transition-colors hover:bg-fd-accent"
+          >
+            <h3 className="mb-2 text-[15px] font-semibold">{f.title}</h3>
+            <p className="m-0 text-[14px] leading-relaxed text-fd-muted-foreground">{f.body}</p>
+          </Link>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function QuoteView({ s }: { s: QuoteSection }) {
+  return (
+    <div className="mx-auto max-w-[640px] text-center">
+      <div aria-hidden className="font-mono text-[44px] leading-none text-[var(--docsdev-accent,#e8753b)]">
+        &ldquo;
+      </div>
+      <p className="m-0 mt-1 text-[21px] font-medium leading-relaxed">{s.text}</p>
+      <p className="mt-5 text-[14px] text-fd-muted-foreground">
+        {s.name}
+        {s.role ? ` · ${s.role}` : ''}
+      </p>
+    </div>
+  );
+}
+
+function CtaView({ s }: { s: CtaSection }) {
+  return (
+    <div className="rounded-3xl border border-fd-border p-10 text-center">
+      <h2 className="m-0 text-[24px] font-bold">{s.title}</h2>
+      <p className="mx-auto mt-3 max-w-[440px] text-[15px] text-fd-muted-foreground">{s.body}</p>
+      <div className="mt-6 flex justify-center gap-3">
+        {s.ctas.map((cta, i) => (
+          <Cta key={i} cta={cta} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function SectionView({ s }: { s: LandingSection }) {
+  switch (s.type) {
+    case 'hero':
+      return <HeroView s={s} />;
+    case 'flow':
+      return <FlowView s={s} />;
+    case 'features':
+      return <FeaturesView s={s} />;
+    case 'quote':
+      return <QuoteView s={s} />;
+    case 'cta':
+      return <CtaView s={s} />;
+  }
 }
 
 /** The published look, straight from copy — also used as the editor's
@@ -101,61 +253,11 @@ export function codeObstacle(code: string, node?: React.ReactNode): Obstacle {
 export function LandingView({ copy }: { copy: LandingCopy }) {
   return (
     <main className="mx-auto w-full max-w-[860px] px-6 pb-28">
-      {/* Hero */}
-      <section className="pt-20 pb-14">
-        <p className="mb-3 font-mono text-[13px] uppercase tracking-[0.14em] text-[var(--docsdev-accent,#e8753b)]">
-          {copy.hero.eyebrow}
-        </p>
-        <h1 className="m-0 text-[44px] font-extrabold leading-[1.05] tracking-[-0.02em] sm:text-[56px]">
-          {copy.hero.titleLines.map((line, i) => (
-            <span key={i}>
-              {i > 0 && <br />}
-              {line}
-            </span>
-          ))}
-        </h1>
-        <p className="mt-6 max-w-[560px] text-[17px] leading-relaxed text-fd-muted-foreground">{copy.hero.tagline}</p>
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          {copy.hero.ctas.map((cta, i) => (
-            <Cta key={i} cta={cta} />
-          ))}
-        </div>
-      </section>
-
-      {/* Live pretext demo */}
-      <section aria-label="Live layout demo">
-        <Flow text={copy.demo.intro} obstacles={[orbObstacle()]} />
-        <div className="h-14" />
-        <Flow text={copy.demo.body} obstacles={[codeObstacle(copy.demo.code)]} />
-      </section>
-
-      {/* Features */}
-      <section className="mt-24">
-        <h2 className="mb-8 text-[26px] font-bold tracking-[-0.01em]">{copy.features.heading}</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {copy.features.items.map((f, i) => (
-            <Link
-              key={i}
-              href={f.href || '/docs'}
-              className="rounded-2xl border border-fd-border p-5 no-underline transition-colors hover:bg-fd-accent"
-            >
-              <h3 className="mb-2 text-[15px] font-semibold">{f.title}</h3>
-              <p className="m-0 text-[14px] leading-relaxed text-fd-muted-foreground">{f.body}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Closing CTA */}
-      <section className="mt-24 rounded-3xl border border-fd-border p-10 text-center">
-        <h2 className="m-0 text-[24px] font-bold">{copy.closing.title}</h2>
-        <p className="mx-auto mt-3 max-w-[440px] text-[15px] text-fd-muted-foreground">{copy.closing.body}</p>
-        <div className="mt-6 flex justify-center gap-3">
-          {copy.closing.ctas.map((cta, i) => (
-            <Cta key={i} cta={cta} />
-          ))}
-        </div>
-      </section>
+      {copy.sections.map((s, i) => (
+        <section key={i} className={sectionClass(s.type, i)}>
+          <SectionView s={s} />
+        </section>
+      ))}
     </main>
   );
 }

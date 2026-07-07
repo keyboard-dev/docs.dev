@@ -358,6 +358,18 @@ article figcaption,
   background: transparent !important;
 }
 
+/* Layout editor: the between-sections insert rail's hairline, revealed on
+   hover of its row. */
+.dd-insert-line {
+  height: 1px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+*:hover > .dd-insert-line {
+  background: color-mix(in srgb, var(--docsdev-accent, #c2571f) 40%, transparent);
+}
+
 /* Reorder-drag insertion indicator. */
 .dd-drop-line {
   position: absolute;

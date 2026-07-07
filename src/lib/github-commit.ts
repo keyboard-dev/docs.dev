@@ -16,7 +16,7 @@ export type CommitFileResult =
 
 export async function commitRepoFile(
   session: Session,
-  opts: { path: string; content: string; message: string },
+  opts: { path: string; content?: string; contentBase64?: string; message: string },
 ): Promise<CommitFileResult> {
   const cred = await repoCredential(session);
   if (!cred) {
@@ -52,7 +52,7 @@ export async function commitRepoFile(
       headers: { ...headers, 'content-type': 'application/json' },
       body: JSON.stringify({
         message: opts.message,
-        content: Buffer.from(opts.content, 'utf8').toString('base64'),
+        content: opts.contentBase64 ?? Buffer.from(opts.content ?? '', 'utf8').toString('base64'),
         branch,
         ...(sha ? { sha } : {}),
       }),
