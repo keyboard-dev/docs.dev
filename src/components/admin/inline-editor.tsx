@@ -24,6 +24,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { Eye, Pencil } from 'lucide-react';
 import * as runtime from 'react/jsx-runtime';
 import { EditableDoc } from './editable-doc';
+import { DeployStatusCard, forgetPublish, recallPublish, type PublishRef } from './deploy-status';
 import { usePageDraft } from './use-page-draft';
 import { getMDXComponents } from '@/components/mdx';
 import { getDraft } from '@/lib/drafts';
@@ -152,7 +153,7 @@ function PreviewInPlace({ source }: { source: string }) {
 }
 
 function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, published: boolean) => void }) {
-  const { source, revision, status, publishing, conflict, onChange, discard, publish, adoptConflict, overwriteConflict, getCurrent } = usePageDraft(slug);
+  const { source, revision, status, publishing, conflict, lastPublish, dismissPublishInfo, onChange, discard, publish, adoptConflict, overwriteConflict, getCurrent } = usePageDraft(slug);
   const [mode, setMode] = useState<'edit' | 'preview'>('edit');
   // Snapshot of the draft for preview mode (kept in sync when toggling).
   const [previewSource, setPreviewSource] = useState('');
@@ -266,7 +267,33 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, 
           Done
         </button>
       </div>
+      {lastPublish && (
+        <DeployStatusCard
+          publish={lastPublish}
+          onDismiss={dismissPublishInfo}
+          style={{ position: 'fixed', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 89 }}
+        />
+      )}
     </>
+  );
+}
+
+/** The same deploy-status card, shown after the editor closes — anchored to
+ *  the "Edit page / PUBLISHED ✓" pill while the publish makes its way live. */
+function PublishedStatusFloat({ slug }: { slug: string }) {
+  const [publish, setPublish] = useState<PublishRef | null>(() =>
+    typeof window === 'undefined' ? null : recallPublish(slug),
+  );
+  if (!publish) return null;
+  return (
+    <DeployStatusCard
+      publish={publish}
+      onDismiss={() => {
+        forgetPublish();
+        setPublish(null);
+      }}
+      style={{ position: 'fixed', right: 20, bottom: 72, zIndex: 60 }}
+    />
   );
 }
 
@@ -376,6 +403,7 @@ export function InlineEditor() {
           )}
         </button>
       )}
+      {!open && showOverride && override.kind === 'published' && <PublishedStatusFloat slug={slug} />}
       {open && (
         <EditOverlay
           slug={slug}
