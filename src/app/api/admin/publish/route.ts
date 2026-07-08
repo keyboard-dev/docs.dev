@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { docRepoPath, readSession, sealSession, SESSION_COOKIE, SESSION_MAX_AGE_S } from '@/lib/admin';
 import { repoCredential } from '@/lib/github-auth';
+import { resolveBranch } from '@/lib/github-branch';
 import { checkDocSource } from '@/lib/mdx-check';
 import { gitConfig } from '@/lib/shared';
 
@@ -25,6 +26,7 @@ async function commitFile(
   message: string,
   headers: GhHeaders,
 ): Promise<{ commitUrl: string; commitSha: string } | { error: string; status: number }> {
+  const target = `${owner}/${repo}@${branch}`;
   const base = `https://api.github.com/repos/${owner}/${repo}/contents/${repoPath}`;
   let sha: string | undefined;
   const head = await fetch(`${base}?ref=${encodeURIComponent(branch)}`, { headers });
@@ -32,7 +34,7 @@ async function commitFile(
     sha = ((await head.json()) as { sha?: string }).sha;
   } else if (head.status !== 404) {
     const detail = await head.text().catch(() => '');
-    return { error: `GitHub read failed (${head.status}). ${detail.slice(0, 200)}`, status: 502 };
+    return { error: `GitHub read failed (${head.status}) for ${target}. ${detail.slice(0, 200)}`, status: 502 };
   }
   const res = await fetch(base, {
     method: 'PUT',
@@ -41,7 +43,10 @@ async function commitFile(
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    return { error: `GitHub commit failed (${res.status}). ${detail.slice(0, 200)}`, status: 502 };
+    const hint = res.status === 404
+      ? ' A 404 here means the branch does not exist or the credential cannot access the repo — check GITHUB_OWNER/GITHUB_REPO/GITHUB_BRANCH.'
+      : '';
+    return { error: `GitHub commit failed (${res.status}) for ${target}.${hint} ${detail.slice(0, 200)}`, status: 502 };
   }
   const data = (await res.json()) as { commit?: { html_url?: string; sha?: string } };
   return { commitUrl: data.commit?.html_url ?? '', commitSha: data.commit?.sha ?? '' };
@@ -90,7 +95,7 @@ export async function POST(request: Request) {
 
   const owner = process.env.GITHUB_OWNER ?? gitConfig.user;
   const repo = process.env.GITHUB_REPO ?? gitConfig.repo;
-  const branch = process.env.GITHUB_BRANCH ?? gitConfig.branch;
+  const branch = await resolveBranch(owner, repo, cred.token);
   const headers: GhHeaders = {
     Authorization: `Bearer ${cred.token}`,
     Accept: 'application/vnd.github+json',

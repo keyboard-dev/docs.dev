@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readSession, sealSession, SESSION_COOKIE, SESSION_MAX_AGE_S } from '@/lib/admin';
 import { repoCredential } from '@/lib/github-auth';
+import { resolveBranch } from '@/lib/github-branch';
 import { gitConfig } from '@/lib/shared';
 
 /**
@@ -48,7 +49,7 @@ export async function PUT(request: Request) {
 
   const owner = process.env.GITHUB_OWNER ?? gitConfig.user;
   const repo = process.env.GITHUB_REPO ?? gitConfig.repo;
-  const branch = process.env.GITHUB_BRANCH ?? gitConfig.branch;
+  const branch = await resolveBranch(owner, repo, cred.token);
   const headers = {
     Authorization: `Bearer ${cred.token}`,
     Accept: 'application/vnd.github+json',

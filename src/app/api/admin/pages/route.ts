@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isAdmin, listDocs, docRepoPath, readSession } from '@/lib/admin';
 import { repoCredential } from '@/lib/github-auth';
+import { resolveBranch } from '@/lib/github-branch';
 import { getDraftStore } from '@/lib/draft-store';
 import { gitConfig } from '@/lib/shared';
 
@@ -41,7 +42,7 @@ export async function DELETE(request: Request) {
   }
   const owner = process.env.GITHUB_OWNER ?? gitConfig.user;
   const repo = process.env.GITHUB_REPO ?? gitConfig.repo;
-  const branch = process.env.GITHUB_BRANCH ?? gitConfig.branch;
+  const branch = await resolveBranch(owner, repo, cred.token);
   const headers = {
     Authorization: `Bearer ${cred.token}`,
     Accept: 'application/vnd.github+json',

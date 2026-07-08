@@ -39,7 +39,9 @@
   "vars": {
     "GITHUB_OWNER": "keyboard-dev",
     "GITHUB_REPO": "docs.dev",
-    "GITHUB_BRANCH": "main",
+    // Branch publishes commit to. Empty = the repo's default branch, resolved
+    // at runtime — set only to pin publishes to a specific non-default branch.
+    "GITHUB_BRANCH": "",
     // Team sign-in via docs.dev. Register your site in the docs.dev dashboard
     // (redirect URI: https://<your-host>/api/admin/sso/callback), then paste
     // the Site ID here. When set, docs.dev sign-in is the ONLY method — PIN
