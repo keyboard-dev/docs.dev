@@ -1,0 +1,86 @@
+---
+title: Why docs.dev + Claude Code
+description: Your docs are a repo Claude Code already knows how to work in — write, verify, and ship pages with one-line requests.
+---
+
+Most docs platforms make agents second-class citizens: content lives in a
+database behind a proprietary API, so an agent needs a custom integration
+before it can change a word. docs.dev inverts that. Your documentation is
+**MDX files in your own GitHub repository** — the exact medium Claude Code is
+best at working in. No plugin, no connector, no export step. `cd` into the
+repo, run `claude`, and ask for what you want.
+
+```bash
+cd your-docs-repo
+claude
+# > document the new webhooks API — endpoint list is in src/routes/webhooks.ts
+```
+
+## The repo ships agent-ready
+
+Every docs.dev site is created with the guardrails an agent needs already in
+place:
+
+- **`CLAUDE.md` teaches the conventions.** Where pages live, the required
+  frontmatter, how URLs derive from file paths, how the sidebar is ordered,
+  and which commands verify a change. Claude reads it on session start, so
+  "add a quickstart page" works on day one — no prompt engineering required.
+- **A `/new-page` skill does the chore correctly.** Creating a page isn't
+  just writing a file: it's a valid slug, frontmatter, a `meta.json` entry,
+  and a passing type check. The skill encodes all of it, so every generated
+  page lands consistent with the rest of the site.
+- **Verification is one command.** `pnpm types:check` validates frontmatter
+  and MDX across the whole site. Claude runs it before pushing, which means
+  broken pages get caught in the session — not in production.
+
+## Publishing is just `git push`
+
+There is no "sync" step between what Claude writes and what readers see.
+Pages are files, publishing is a commit, and pushing to the default branch
+triggers your own Cloudflare CI. A typical request — *"document the new
+rate-limit headers"* — ends with the change live in about a minute, with a
+real commit in your history that you can review, revert, or cherry-pick like
+any code change.
+
+Want a human in the loop? Ask Claude to open a pull request instead, and
+review the docs the way you review code.
+
+## Agents and humans never fight
+
+The editor, your teammates, and Claude Code all converge on the same source
+of truth: whatever lands on the default branch is what deploys. Editor
+publishes are commits; agent edits are commits. There's no CMS state to drift
+out of sync with the repo, and no lock an agent can trip over.
+
+<Callout title="Files always win">
+  Because the repo is the only source of truth, you can mix workflows
+  freely: a writer polishes a page in the on-page editor while Claude Code
+  drafts three new API pages in a branch. Git merges it; nothing gets lost.
+</Callout>
+
+## Things people actually ask for
+
+These are all one-line requests in a docs.dev repo:
+
+- *"Add a troubleshooting page for common deploy errors and link it from
+  getting started."*
+- *"Our SDK renamed `client.connect()` to `client.open()` — update every
+  code sample that uses it."*
+- *"Read `src/routes/billing.ts` and write reference docs for each
+  endpoint."*
+- *"Restructure the sidebar so the API reference comes last."*
+
+Because docs and code can live side by side, the last-mile problem of
+documentation — keeping it true to the code — becomes a request Claude can
+verify against the source itself.
+
+## Beyond the terminal
+
+The same properties that make the repo good for Claude Code make it good for
+every agent surface: Claude Code on the web, GitHub Actions that file
+docs PRs when APIs change, or scheduled sessions that audit pages for
+staleness. Anything that can make a git commit can maintain your docs.
+
+Ready to try it? [Get started](/docs/getting-started), then point Claude
+Code at the repo — or see [Editing](/docs/editing) for how agent edits and
+the on-page editor fit together.
