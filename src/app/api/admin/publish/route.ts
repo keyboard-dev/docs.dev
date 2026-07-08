@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { docRepoPath, readSession, sealSession, SESSION_COOKIE, SESSION_MAX_AGE_S } from '@/lib/admin';
 import { repoCredential } from '@/lib/github-auth';
+import { checkDocSource } from '@/lib/mdx-check';
 import { gitConfig } from '@/lib/shared';
 
 /**
@@ -23,7 +24,7 @@ async function commitFile(
   base64Content: string,
   message: string,
   headers: GhHeaders,
-): Promise<{ commitUrl: string } | { error: string; status: number }> {
+): Promise<{ commitUrl: string; commitSha: string } | { error: string; status: number }> {
   const base = `https://api.github.com/repos/${owner}/${repo}/contents/${repoPath}`;
   let sha: string | undefined;
   const head = await fetch(`${base}?ref=${encodeURIComponent(branch)}`, { headers });
@@ -42,8 +43,8 @@ async function commitFile(
     const detail = await res.text().catch(() => '');
     return { error: `GitHub commit failed (${res.status}). ${detail.slice(0, 200)}`, status: 502 };
   }
-  const data = (await res.json()) as { commit?: { html_url?: string } };
-  return { commitUrl: data.commit?.html_url ?? '' };
+  const data = (await res.json()) as { commit?: { html_url?: string; sha?: string } };
+  return { commitUrl: data.commit?.html_url ?? '', commitSha: data.commit?.sha ?? '' };
 }
 
 export async function POST(request: Request) {
@@ -74,6 +75,17 @@ export async function POST(request: Request) {
   const path = docRepoPath(slug);
   if (!path) {
     return NextResponse.json({ ok: false, error: 'Invalid slug' }, { status: 400 });
+  }
+
+  // Pre-flight: reject content that would break the Workers Build before it
+  // ever reaches the repo — a failed build strands the site on the old deploy.
+  const check = await checkDocSource(content);
+  if (!check.ok) {
+    const where = check.line != null ? ` (line ${check.line}${check.column != null ? `:${check.column}` : ''})` : '';
+    return NextResponse.json(
+      { ok: false, error: `Won't publish — this would fail the site build${where}: ${check.error}` },
+      { status: 422 },
+    );
   }
 
   const owner = process.env.GITHUB_OWNER ?? gitConfig.user;
@@ -116,7 +128,15 @@ export async function POST(request: Request) {
     );
     if ('error' in r) return NextResponse.json({ ok: false, error: r.error }, { status: r.status });
 
-    const res = NextResponse.json({ ok: true, commitUrl: r.commitUrl });
+    // The doc commit is made last, so its SHA is the branch head containing
+    // everything this publish wrote — the anchor for deploy-status polling.
+    const res = NextResponse.json({
+      ok: true,
+      commitUrl: r.commitUrl,
+      commitSha: r.commitSha,
+      repo: `${owner}/${repo}`,
+      branch,
+    });
     // A token refresh may have produced an updated session — persist it.
     if (cred.updated) {
       res.cookies.set(SESSION_COOKIE, sealSession(cred.updated), {

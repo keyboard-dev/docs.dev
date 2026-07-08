@@ -23,6 +23,7 @@ import {
   pushServerDraft,
   type RemoteDraft,
 } from '@/lib/draft-sync';
+import { forgetPublish, recallPublish, rememberPublish, type PublishRef } from './deploy-status';
 import { docsContentRoute } from '@/lib/shared';
 
 const PUSH_DEBOUNCE_MS = 2500;
@@ -41,6 +42,11 @@ export function usePageDraft(slug: string) {
   const [publishing, setPublishing] = useState(false);
   /** A teammate's newer draft that blocked our last push (409). */
   const [conflict, setConflict] = useState<RemoteDraft | null>(null);
+  /** The commit our last publish created — drives the deploy-status card.
+   *  Recalled from sessionStorage so it survives closing/reopening the editor. */
+  const [lastPublish, setLastPublish] = useState<PublishRef | null>(() =>
+    typeof window === 'undefined' ? null : recallPublish(slug),
+  );
   /** Bumped whenever `source` is replaced wholesale (load/discard/adopt) so the
    *  editor remounts with fresh state instead of keeping stale blocks. */
   const [revision, setRevision] = useState(0);
@@ -185,8 +191,26 @@ export function usePageDraft(slug: string) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ slug, content: draftRef.current, assets }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        commitSha?: string;
+        commitUrl?: string;
+        repo?: string;
+        branch?: string;
+      };
       if (!res.ok) throw new Error(data.error ?? 'Publish failed.');
+      if (data.commitSha) {
+        const ref: PublishRef = {
+          slug,
+          sha: data.commitSha,
+          url: data.commitUrl ?? '',
+          repo: data.repo ?? '',
+          branch: data.branch ?? '',
+          at: Date.now(),
+        };
+        rememberPublish(ref);
+        setLastPublish(ref);
+      }
       await deleteDraft(slug);
       await deleteInlineEdits(slug);
       await deleteServerDraft(slug);
@@ -219,6 +243,11 @@ export function usePageDraft(slug: string) {
     }
   }, [slug]);
 
+  const dismissPublishInfo = useCallback(() => {
+    forgetPublish();
+    setLastPublish(null);
+  }, []);
+
   return {
     source,
     revision,
@@ -226,6 +255,8 @@ export function usePageDraft(slug: string) {
     status,
     publishing,
     conflict,
+    lastPublish,
+    dismissPublishInfo,
     onChange,
     discard,
     publish,
