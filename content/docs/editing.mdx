@@ -55,6 +55,19 @@ page. The preview is local to you until you hit **Publish**, which commits
 `src/app/theme.css` to your repo like any other edit; push-to-deploy CI
 rebuilds the site with the new accent for everyone.
 
+## API reference from your OpenAPI spec
+
+Admins also get an **API specs…** entry in the sidebar. Upload an OpenAPI
+document (JSON) and it's committed to `openapi/` in your repo; the next
+build generates a full API reference from it under `/docs/api-reference` —
+one page per operation, grouped by tag, each with an interactive
+playground. Re-upload under the same name to update it, or remove it to
+retire the section. Multiple specs each get their own section.
+
+Prefer git? Drop the file into `openapi/` and push — the upload button and
+the commit are the same thing. Never edit the generated pages by hand; they
+are rebuilt from the spec on every deploy.
+
 ## Editing with Claude Code
 
 The repo is agent-ready: `CLAUDE.md` teaches the conventions (where pages

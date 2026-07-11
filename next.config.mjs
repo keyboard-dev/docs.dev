@@ -1,6 +1,12 @@
 import { createMDX } from 'fumadocs-mdx/next';
+import { generateApiDocs } from './scripts/generate-api-docs.mjs';
 import { generateContentManifest } from './scripts/gen-content-manifest.mjs';
 import { getBuildInfo } from './scripts/build-info.mjs';
+
+// Regenerate the API reference from the committed OpenAPI specs, so uploading
+// a spec (a one-file commit) is all it takes — the pages follow at build time.
+// Must run before the content manifest snapshot below picks them up.
+await generateApiDocs();
 
 // Snapshot docs content into a manifest so the admin editor can read baseline
 // page source without runtime fs (required on Cloudflare Workers).

@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
-import { Check, FilePlus2, Files, GitBranch, Palette, Trash2, X } from 'lucide-react';
+import { Check, FileJson2, FilePlus2, Files, GitBranch, Palette, Trash2, Upload, X } from 'lucide-react';
 import { putDraft, deleteDraft } from '@/lib/drafts';
 import { editorName, fetchServerDraft, listServerDrafts, primeEditorName, pushServerDraft, deleteServerDraft } from '@/lib/draft-sync';
 
@@ -63,6 +63,11 @@ export function SidebarAdmin() {
   const [branch, setBranch] = useState<string | null>(null);
   const [branchPages, setBranchPages] = useState<BranchPageRow[] | null>(null);
   const [branchNote, setBranchNote] = useState('');
+  const [specsOpen, setSpecsOpen] = useState(false);
+  const [specs, setSpecs] = useState<Array<{ name: string; size: number }> | null>(null);
+  const [specNote, setSpecNote] = useState('');
+  const [specBusy, setSpecBusy] = useState(false);
+  const specFileRef = useRef<HTMLInputElement>(null);
 
   // Re-apply a locally previewed (unpublished) accent for admins on load.
   useEffect(() => {
@@ -198,12 +203,70 @@ export function SidebarAdmin() {
     };
   }, [admin, rows, router]);
 
+  /* OpenAPI specs: list openapi/*.json, upload a new/updated spec (committed
+     to the deploy branch — the build regenerates the API reference from it),
+     and delete specs. */
+  const openSpecs = useCallback(async () => {
+    setOpen(false);
+    setThemeOpen(false);
+    setBranchesOpen(false);
+    setSpecNote('');
+    setSpecsOpen((o) => !o);
+    setSpecs(null);
+    const res = await fetch('/api/admin/openapi');
+    const data = (await res.json().catch(() => ({}))) as { specs?: Array<{ name: string; size: number }>; error?: string };
+    if (!res.ok) {
+      setSpecNote(data.error ?? 'Could not list API specs.');
+      setSpecs([]);
+      return;
+    }
+    setSpecs(data.specs ?? []);
+  }, []);
+
+  const uploadSpec = useCallback(async (file: File) => {
+    const name = slugify(file.name.replace(/\.json$/i, '')).replace(/[^a-z0-9-]/g, '') || 'api';
+    setSpecBusy(true);
+    setSpecNote(`Validating ${file.name}…`);
+    try {
+      const content = await file.text();
+      const res = await fetch('/api/admin/openapi', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name, content }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok) {
+        setSpecNote(data.error ?? 'Upload failed.');
+        return;
+      }
+      setSpecNote(`Committed openapi/${name}.json — the site is rebuilding; the reference updates when the deploy lands.`);
+      const list = await fetch('/api/admin/openapi').then((r) => r.json()).catch(() => ({}));
+      setSpecs(list.specs ?? null);
+    } finally {
+      setSpecBusy(false);
+      if (specFileRef.current) specFileRef.current.value = '';
+    }
+  }, []);
+
+  const deleteSpec = useCallback(async (name: string) => {
+    if (!window.confirm(`Remove the "${name}" spec? Its reference pages disappear on the next build.`)) return;
+    const res = await fetch(`/api/admin/openapi?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!res.ok) {
+      setSpecNote(data.error ?? 'Delete failed.');
+      return;
+    }
+    setSpecNote(`Removed ${name} — committed; the reference updates on the next deploy.`);
+    setSpecs((s) => (s ?? []).filter((x) => x.name !== name));
+  }, []);
+
   /* Branch review: list branches, list a branch's changed docs pages, and
      load one into the shared-draft store — from there the normal preview/
      edit/publish flow applies. Read-only against git. */
   const openBranches = useCallback(async () => {
     setOpen(false);
     setThemeOpen(false);
+    setSpecsOpen(false);
     setBranchNote('');
     setBranch(null);
     setBranchPages(null);
@@ -316,6 +379,7 @@ export function SidebarAdmin() {
                 setNote('');
                 setThemeOpen(false);
                 setBranchesOpen(false);
+                setSpecsOpen(false);
                 setOpen((o) => !o);
                 void refresh();
               }}
@@ -346,9 +410,24 @@ export function SidebarAdmin() {
               <GitBranch size={14} /> Branches…
             </button>
             <button
+              onClick={() => void openSpecs()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px',
+                border: 'none', borderRadius: 8, background: 'transparent',
+                color: 'var(--color-fd-muted-foreground)', fontSize: 13.5, fontWeight: 500,
+                cursor: 'pointer', textAlign: 'left',
+                fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <FileJson2 size={14} /> API specs…
+            </button>
+            <button
               onClick={() => {
                 setOpen(false);
                 setBranchesOpen(false);
+                setSpecsOpen(false);
                 setThemeOpen((o) => !o);
               }}
               style={{
@@ -459,6 +538,89 @@ export function SidebarAdmin() {
               {themeNote}
             </div>
           )}
+        </div>
+      )}
+
+      {specsOpen && (
+        <div
+          className="dd-pop"
+          style={{
+            position: 'fixed', left: 16, bottom: 64, zIndex: 95, width: 300,
+            maxHeight: '60vh', display: 'flex', flexDirection: 'column',
+            fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--color-fd-border)' }}>
+            <FileJson2 size={13} style={{ color: 'var(--color-fd-muted-foreground)' }} />
+            <strong style={{ fontSize: 13.5, flex: 1 }}>API specs</strong>
+            <button onClick={() => setSpecsOpen(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-fd-muted-foreground)', display: 'flex' }}>
+              <X size={14} />
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 6, padding: 10, borderBottom: '1px solid var(--color-fd-border)' }}>
+            <input
+              ref={specFileRef}
+              type="file"
+              accept=".json,application/json"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void uploadSpec(file);
+              }}
+            />
+            <button
+              onClick={() => specFileRef.current?.click()}
+              disabled={specBusy}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flex: 1, height: 30,
+                borderRadius: 8, border: 'none', background: ACCENT, color: '#fff',
+                fontWeight: 600, fontSize: 12.5, cursor: 'pointer', opacity: specBusy ? 0.6 : 1,
+              }}
+            >
+              <Upload size={13} /> Upload OpenAPI spec (.json)
+            </button>
+          </div>
+
+          <div style={{ overflowY: 'auto', padding: 6 }}>
+            {(specs ?? []).map((spec) => (
+              <div
+                key={spec.name}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8 }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {spec.name}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--color-fd-muted-foreground)' }}>
+                  {spec.size >= 1024 ? `${Math.round(spec.size / 1024)} KB` : `${spec.size} B`}
+                </span>
+                <button
+                  onClick={() => void deleteSpec(spec.name)}
+                  title="Remove spec"
+                  className="dd-icon-btn"
+                  data-danger="1"
+                  style={{ width: 22, height: 22, border: 'none', background: 'transparent' }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+            {specs === null && <div style={{ padding: 10, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)' }}>Loading…</div>}
+            {specs?.length === 0 && !specNote && (
+              <div style={{ padding: 10, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)' }}>No specs yet — upload one to generate an API reference.</div>
+            )}
+          </div>
+
+          {specNote && (
+            <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-fd-border)', fontSize: 12, color: 'var(--color-fd-muted-foreground)' }}>
+              {specNote}
+            </div>
+          )}
+          <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-fd-border)', fontSize: 11.5, color: 'var(--color-fd-muted-foreground)' }}>
+            Uploads commit to <code>openapi/</code>; the build regenerates /docs/api-reference from them — reuploading a name replaces that spec.
+          </div>
         </div>
       )}
 

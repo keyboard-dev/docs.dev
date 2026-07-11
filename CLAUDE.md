@@ -71,10 +71,19 @@ rebuilds and redeploys the site. Prefer that over running `cf:deploy` yourself.
 2. `pnpm dev`, then load the changed page under `/docs/...`.
 3. If you changed nav structure, confirm the sidebar in the browser.
 
+## API reference (OpenAPI)
+
+The pages under `content/docs/api-reference/` are GENERATED from the specs
+in `openapi/*.json` — at build time and by `pnpm generate:api`. To change
+the API reference, edit (or add/remove) a spec in `openapi/` and regenerate;
+never edit those pages directly, they are wiped on every build.
+
 ## Things not to do
 
-- Don't edit `src/lib/content-manifest.generated.json` — it's generated at
-  build time by `scripts/gen-content-manifest.mjs`.
+- Don't edit `src/lib/content-manifest.generated.json` or
+  `src/lib/openapi-specs.generated.json` — both are generated at build time.
+- Don't edit `content/docs/api-reference/**` by hand — see "API reference"
+  above.
 - Don't rename `content/docs/` paths casually; URLs are derived from them.
 - Don't commit secrets. `GITHUB_PAT` / `ADMIN_PIN` are Wrangler secrets, never
   files in the repo.
