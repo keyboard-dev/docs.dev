@@ -18,7 +18,7 @@ import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
 import { Check, FilePlus2, Files, GitBranch, Palette, Trash2, X } from 'lucide-react';
 import { putDraft, deleteDraft } from '@/lib/drafts';
-import { editorName, listServerDrafts, primeEditorName, pushServerDraft, deleteServerDraft } from '@/lib/draft-sync';
+import { editorName, fetchServerDraft, listServerDrafts, primeEditorName, pushServerDraft, deleteServerDraft } from '@/lib/draft-sync';
 
 const ACCENT = 'var(--docsdev-accent, #c2571f)';
 
@@ -247,9 +247,20 @@ export function SidebarAdmin() {
         return;
       }
       const slug = page.slug === 'index' ? '' : page.slug;
-      const pushed = await pushServerDraft(slug, data.content, 0, editorName(true));
+      // Re-reviewing refreshes the snapshot — but never clobber an existing
+      // draft (even your own touch-ups) without an explicit OK.
+      const existing = await fetchServerDraft(slug);
+      if (existing && existing.content !== data.content) {
+        const label = page.slug === 'index' ? 'the home page' : `"${page.slug}"`;
+        if (!window.confirm(`Replace the existing draft of ${label} (by ${existing.author}) with the branch version?`)) {
+          setBranchNote('Kept the existing draft.');
+          return;
+        }
+      }
+      const pushed = await pushServerDraft(slug, data.content, existing?.updatedAt ?? 0, editorName(true));
       if (!pushed.ok && 'conflict' in pushed) {
-        setBranchNote(`A draft by ${pushed.conflict.author} already exists for this page — resolve it in the editor first.`);
+        // Raced with a save between the check and the push.
+        setBranchNote(`${pushed.conflict.author} just saved a newer draft of this page — try again.`);
         return;
       }
       await putDraft(slug, data.content);
