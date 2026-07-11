@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
-import { Check, FilePlus2, Files, Palette, Trash2, X } from 'lucide-react';
+import { Check, FilePlus2, Files, GitBranch, Palette, Trash2, X } from 'lucide-react';
 import { putDraft, deleteDraft } from '@/lib/drafts';
 import { editorName, listServerDrafts, primeEditorName, pushServerDraft, deleteServerDraft } from '@/lib/draft-sync';
 
@@ -42,6 +42,7 @@ function slugify(text: string): string {
 }
 
 type PageRow = { slug: string; draftOnly: boolean; author?: string };
+type BranchPageRow = { slug: string; path: string; status: 'added' | 'modified' };
 
 export function SidebarAdmin() {
   const router = useRouter();
@@ -57,6 +58,11 @@ export function SidebarAdmin() {
   const [accent, setAccent] = useState('#c2571f');
   const [themeNote, setThemeNote] = useState('');
   const [publishingTheme, setPublishingTheme] = useState(false);
+  const [branchesOpen, setBranchesOpen] = useState(false);
+  const [branches, setBranches] = useState<string[] | null>(null);
+  const [branch, setBranch] = useState<string | null>(null);
+  const [branchPages, setBranchPages] = useState<BranchPageRow[] | null>(null);
+  const [branchNote, setBranchNote] = useState('');
 
   // Re-apply a locally previewed (unpublished) accent for admins on load.
   useEffect(() => {
@@ -192,6 +198,68 @@ export function SidebarAdmin() {
     };
   }, [admin, rows, router]);
 
+  /* Branch review: list branches, list a branch's changed docs pages, and
+     load one into the shared-draft store — from there the normal preview/
+     edit/publish flow applies. Read-only against git. */
+  const openBranches = useCallback(async () => {
+    setOpen(false);
+    setThemeOpen(false);
+    setBranchNote('');
+    setBranch(null);
+    setBranchPages(null);
+    setBranchesOpen((o) => !o);
+    setBranches(null);
+    const res = await fetch('/api/admin/branches');
+    const data = (await res.json().catch(() => ({}))) as { branches?: Array<{ name: string }>; error?: string };
+    if (!res.ok) {
+      setBranchNote(data.error ?? 'Could not list branches.');
+      setBranches([]);
+      return;
+    }
+    setBranches((data.branches ?? []).map((b) => b.name));
+  }, []);
+
+  const pickBranch = useCallback(async (name: string) => {
+    setBranch(name);
+    setBranchPages(null);
+    setBranchNote('');
+    const res = await fetch(`/api/admin/branches?branch=${encodeURIComponent(name)}`);
+    const data = (await res.json().catch(() => ({}))) as { pages?: BranchPageRow[]; error?: string };
+    if (!res.ok) {
+      setBranchNote(data.error ?? 'Could not compare branches.');
+      setBranchPages([]);
+      return;
+    }
+    setBranchPages(data.pages ?? []);
+    if ((data.pages ?? []).length === 0) setBranchNote('No docs pages changed on this branch.');
+  }, []);
+
+  const loadBranchPage = useCallback(
+    async (page: BranchPageRow) => {
+      if (!branch) return;
+      setBranchNote(`Loading ${page.slug}…`);
+      const res = await fetch(
+        `/api/admin/branches?branch=${encodeURIComponent(branch)}&slug=${encodeURIComponent(page.slug)}`,
+      );
+      const data = (await res.json().catch(() => ({}))) as { content?: string; error?: string };
+      if (!res.ok || typeof data.content !== 'string') {
+        setBranchNote(data.error ?? 'Could not load the page.');
+        return;
+      }
+      const slug = page.slug === 'index' ? '' : page.slug;
+      const pushed = await pushServerDraft(slug, data.content, 0, editorName(true));
+      if (!pushed.ok && 'conflict' in pushed) {
+        setBranchNote(`A draft by ${pushed.conflict.author} already exists for this page — resolve it in the editor first.`);
+        return;
+      }
+      await putDraft(slug, data.content);
+      setBranchesOpen(false);
+      void refresh();
+      router.push(slug ? `/docs/${slug}?edit=1` : '/docs?edit=1');
+    },
+    [branch, refresh, router],
+  );
+
   const createPage = useCallback(async () => {
     const t = title.trim();
     if (!t) return;
@@ -236,6 +304,7 @@ export function SidebarAdmin() {
               onClick={() => {
                 setNote('');
                 setThemeOpen(false);
+                setBranchesOpen(false);
                 setOpen((o) => !o);
                 void refresh();
               }}
@@ -252,8 +321,23 @@ export function SidebarAdmin() {
               <Files size={14} /> Pages…
             </button>
             <button
+              onClick={() => void openBranches()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px',
+                border: 'none', borderRadius: 8, background: 'transparent',
+                color: 'var(--color-fd-muted-foreground)', fontSize: 13.5, fontWeight: 500,
+                cursor: 'pointer', textAlign: 'left',
+                fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <GitBranch size={14} /> Branches…
+            </button>
+            <button
               onClick={() => {
                 setOpen(false);
+                setBranchesOpen(false);
                 setThemeOpen((o) => !o);
               }}
               style={{
@@ -362,6 +446,108 @@ export function SidebarAdmin() {
           {themeNote && (
             <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-fd-border)', fontSize: 12, color: 'var(--color-fd-muted-foreground)' }}>
               {themeNote}
+            </div>
+          )}
+        </div>
+      )}
+
+      {branchesOpen && (
+        <div
+          className="dd-pop"
+          style={{
+            position: 'fixed', left: 16, bottom: 64, zIndex: 95, width: 300,
+            maxHeight: '60vh', display: 'flex', flexDirection: 'column',
+            fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--color-fd-border)' }}>
+            {branch ? (
+              <button
+                onClick={() => {
+                  setBranch(null);
+                  setBranchPages(null);
+                  setBranchNote('');
+                }}
+                title="Back to branches"
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-fd-muted-foreground)', fontSize: 12.5, padding: 0 }}
+              >
+                ←
+              </button>
+            ) : (
+              <GitBranch size={13} style={{ color: 'var(--color-fd-muted-foreground)' }} />
+            )}
+            <strong style={{ fontSize: 13.5, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {branch ?? 'Branches'}
+            </strong>
+            <button onClick={() => setBranchesOpen(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-fd-muted-foreground)', display: 'flex' }}>
+              <X size={14} />
+            </button>
+          </div>
+
+          <div style={{ overflowY: 'auto', padding: 6 }}>
+            {!branch &&
+              (branches ?? []).map((name) => (
+                <button
+                  key={name}
+                  onClick={() => void pickBranch(name)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 8px',
+                    border: 'none', borderRadius: 8, background: 'transparent', cursor: 'pointer',
+                    fontSize: 13, color: 'var(--color-fd-foreground)', textAlign: 'left',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <GitBranch size={12} style={{ color: 'var(--color-fd-muted-foreground)', flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                </button>
+              ))}
+            {!branch && branches === null && (
+              <div style={{ padding: 10, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)' }}>Loading branches…</div>
+            )}
+            {!branch && branches?.length === 0 && !branchNote && (
+              <div style={{ padding: 10, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)' }}>No other branches.</div>
+            )}
+
+            {branch &&
+              (branchPages ?? []).map((page) => (
+                <div
+                  key={page.path}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8 }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {page.slug === 'index' ? 'Home' : page.slug}
+                  </span>
+                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', color: page.status === 'added' ? ACCENT : 'var(--color-fd-muted-foreground)' }}>
+                    {page.status === 'added' ? 'NEW' : 'EDITED'}
+                  </span>
+                  <button
+                    onClick={() => void loadBranchPage(page)}
+                    title="Load into the editor as a draft"
+                    style={{
+                      height: 24, padding: '0 9px', borderRadius: 7, border: 'none', background: ACCENT,
+                      color: '#fff', fontWeight: 600, fontSize: 11.5, cursor: 'pointer',
+                    }}
+                  >
+                    Review
+                  </button>
+                </div>
+              ))}
+            {branch && branchPages === null && (
+              <div style={{ padding: 10, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)' }}>Comparing with the default branch…</div>
+            )}
+          </div>
+
+          {branchNote && (
+            <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-fd-border)', fontSize: 12, color: 'var(--color-fd-muted-foreground)' }}>
+              {branchNote}
+            </div>
+          )}
+          {!branch && (
+            <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-fd-border)', fontSize: 11.5, color: 'var(--color-fd-muted-foreground)' }}>
+              Review docs written on a branch (e.g. by Claude Code): load a page as a draft, touch it up, publish.
             </div>
           )}
         </div>
