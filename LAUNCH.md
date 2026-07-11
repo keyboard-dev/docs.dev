@@ -14,6 +14,13 @@ docs.dev account, no dashboard visits. It combines two mechanisms:
 The user performs exactly two actions, both human-friendly: confirm a 6-digit
 code, and click a claim link within 60 minutes.
 
+> **Known blocker (2026-07):** temporary accounts sit on the Workers free
+> plan, whose **1 MiB** compressed script limit rejects this template's
+> Worker (~5.3 MiB gzipped; API error 10027). Until the flow ships a slimmer
+> preview Worker, step 2 cannot complete on a temporary account — the deploy
+> needs an existing Cloudflare account on the Workers Paid plan (10 MiB).
+> The registration half (steps 1 and 3) works and is testable on its own.
+
 ## The prompt (copy-paste for users)
 
 > Set up a docs site for me using the docs.dev template. Follow
@@ -31,8 +38,10 @@ user's email.
 ### 0. Prerequisites
 
 - Node 20+, pnpm, and network access to `$ISSUER`, GitHub, and Cloudflare.
-- Wrangler **≥ 4.102.0** for `--temporary` (use `npx wrangler@latest` if the
-  repo's pinned version is older).
+- Wrangler **≥ 4.102.0** for `--temporary`. The repo pins a new-enough
+  version. Note that `npx wrangler@latest` does NOT bypass an old pin:
+  wrangler detects the OpenNext project and delegates to
+  `opennextjs-cloudflare deploy`, which runs the **repo-local** wrangler.
 - Read `$ISSUER/auth.md` first — it is the authoritative description of the
   registration flow and may be newer than this file.
 
@@ -71,11 +80,19 @@ token expires.
 
 ### 2. Build and deploy to a temporary Cloudflare account
 
+First remove the `"ai"` block from `wrangler.jsonc` — this is required, not
+optional: the remote `ai` binding makes the deploy open an authenticated
+remote-bindings session ("Could not start remote dev session"), which
+defeats the unauthenticated `--temporary` flow before the upload even
+starts. (Workers AI also isn't on the temporary-account supported list.)
+The editor's "Generate with AI" features simply stay hidden until the
+account is claimed and the binding restored.
+
 ```bash
 git clone https://github.com/keyboard-dev/docs.dev site && cd site
 pnpm install
 pnpm cf:build
-npx wrangler@latest deploy --temporary
+npx wrangler deploy --temporary
 ```
 
 Capture from the output:
@@ -89,10 +106,8 @@ Notes:
   resets the clock). Don't dawdle between steps — and if the user hasn't
   clicked the claim link as the window runs low, proactively redeploy
   (`--temporary` again) to reset it rather than letting the site vanish.
-- If the deploy is rejected because of the `ai` binding (Workers AI is not on
-  the temporary-account supported list), remove the `"ai"` block from
-  `wrangler.jsonc` and deploy again — the editor's "Generate with AI" features
-  simply stay hidden until the account is claimed and the binding restored.
+- The deploy is currently expected to fail with API error 10027 (script size
+  over the free-plan 1 MiB limit) — see the known-blocker note at the top.
 
 ### 3. Register the site and inject the Site ID
 
@@ -150,6 +165,8 @@ they own. Sensible next steps to offer:
 | `user_code` expired before confirmation | Re-register (step 1). Registrations are cheap; codes last 10 min. |
 | `slow_down` from token polling | You're polling faster than `interval`. Back off. |
 | `invalid_redirect_uri` registering the site | The redirect URI must be exactly `https://$HOST/api/admin/sso/callback` — https, no trailing slash, no fragment. |
-| Deploy rejected mentioning the `ai` binding | Remove the `"ai"` block from `wrangler.jsonc`, redeploy (see step 2). |
+| "Could not start remote dev session" / login prompt during deploy | The `ai` remote binding forces an authenticated proxy session. Remove the `"ai"` block from `wrangler.jsonc` before deploying (see step 2). |
+| `Unknown argument: temporary` | The repo-local wrangler is < 4.102.0 (`npx wrangler@latest` doesn't help — the OpenNext delegation runs the local install). Update the `wrangler` devDependency. |
+| Rejected with error 10027 (size limit) | Temporary accounts are free-plan: 1 MiB compressed Worker limit vs this template's ~5.3 MiB. Currently a hard blocker — see the note at the top. |
 | Temp deployment vanished | The 60-minute window lapsed. Redeploy (`--temporary` again) and re-register the new hostname if it changed. |
 | 401 from `/api/v1/sites` | Access token expired — jwt-bearer exchange the `identity_assertion` for a fresh one. |
