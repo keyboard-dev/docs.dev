@@ -20,6 +20,12 @@ imposed by us. If the deployment has the `AI` binding (the default
 `wrangler.jsonc` does), the assistant is live; without it, the button simply
 doesn't render.
 
+Site owners can optionally enable [Ask AI insights](/docs/configuration#bindings-wranglerjsonc):
+questions are then logged **anonymously** — the question text, the page it
+was asked from, and a timestamp; never IPs, accounts, or identifiers — to
+the site's own database, pruned after 90 days, so the team can see what the
+docs failed to answer. Without that binding, nothing is stored.
+
 ## Markdown for every page
 
 Append `.md` to any docs URL to get the page as raw markdown — the convention

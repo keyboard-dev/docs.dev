@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { docRepoPath, readSession, sealSession, SESSION_COOKIE, SESSION_MAX_AGE_S } from '@/lib/admin';
 import { repoCredential } from '@/lib/github-auth';
+import { commitFile, ghHeaders, type GhHeaders } from '@/lib/github-commit';
 import { checkDocSource } from '@/lib/mdx-check';
 import { gitConfig } from '@/lib/shared';
 
@@ -10,42 +11,8 @@ import { gitConfig } from '@/lib/shared';
  * Owner/repo/branch default to gitConfig and can be overridden with env vars.
  *
  * Assets are committed to `public/<path>` so the published site serves them at
- * `<path>` (e.g. /uploads/foo.png). PoC note: this makes one commit per file;
- * a production build would batch them via the Git Trees API.
+ * `<path>` (e.g. /uploads/foo.png).
  */
-
-type GhHeaders = Record<string, string>;
-
-async function commitFile(
-  owner: string,
-  repo: string,
-  branch: string,
-  repoPath: string,
-  base64Content: string,
-  message: string,
-  headers: GhHeaders,
-): Promise<{ commitUrl: string; commitSha: string } | { error: string; status: number }> {
-  const base = `https://api.github.com/repos/${owner}/${repo}/contents/${repoPath}`;
-  let sha: string | undefined;
-  const head = await fetch(`${base}?ref=${encodeURIComponent(branch)}`, { headers });
-  if (head.ok) {
-    sha = ((await head.json()) as { sha?: string }).sha;
-  } else if (head.status !== 404) {
-    const detail = await head.text().catch(() => '');
-    return { error: `GitHub read failed (${head.status}). ${detail.slice(0, 200)}`, status: 502 };
-  }
-  const res = await fetch(base, {
-    method: 'PUT',
-    headers: { ...headers, 'content-type': 'application/json' },
-    body: JSON.stringify({ message, content: base64Content, branch, ...(sha ? { sha } : {}) }),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    return { error: `GitHub commit failed (${res.status}). ${detail.slice(0, 200)}`, status: 502 };
-  }
-  const data = (await res.json()) as { commit?: { html_url?: string; sha?: string } };
-  return { commitUrl: data.commit?.html_url ?? '', commitSha: data.commit?.sha ?? '' };
-}
 
 export async function POST(request: Request) {
   const session = await readSession();
@@ -91,12 +58,7 @@ export async function POST(request: Request) {
   const owner = process.env.GITHUB_OWNER ?? gitConfig.user;
   const repo = process.env.GITHUB_REPO ?? gitConfig.repo;
   const branch = process.env.GITHUB_BRANCH ?? gitConfig.branch;
-  const headers: GhHeaders = {
-    Authorization: `Bearer ${cred.token}`,
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'docs.dev-admin',
-  };
+  const headers: GhHeaders = ghHeaders(cred.token);
 
   try {
     // Commit assets first (served from public/), so the published doc resolves

@@ -26,6 +26,18 @@ local development, put secrets in a `.dev.vars` file (never committed).
 | `GITHUB_APP_CLIENT_ID` + `GITHUB_APP_CLIENT_SECRET` | [GitHub sign-in](/docs/standalone-auth#github-sign-in). |
 | `TAVILY_API_KEY` *or* `BRAVE_API_KEY` | Optional [web-search grounding](/docs/ai#grounding-with-web-search-optional) for AI writing. |
 
+## Bindings (`wrangler.jsonc`)
+
+| Binding | Purpose |
+| --- | --- |
+| `AI` (Workers AI) | [AI writing & images](/docs/ai) in the editor and the reader-facing [Ask AI assistant](/docs/agents#ask-ai). Included by default; remove it and both features hide themselves. |
+| `INSIGHTS` (D1, optional) | [Ask AI insights](/docs/agents#ask-ai) — logs reader questions anonymously so admins can see what the docs couldn't answer. Off until you create the database and uncomment the block: |
+
+```bash
+npx wrangler d1 create docsdev-insights
+# paste the returned id into the d1_databases block in wrangler.jsonc
+```
+
 ## Sign-in precedence
 
 1. **`DOCSDEV_SITE_ID` set** → docs.dev team sign-in only. PIN and GitHub

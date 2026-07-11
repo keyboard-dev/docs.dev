@@ -17,7 +17,7 @@ code, and click a claim link within 60 minutes.
 ## The prompt (copy-paste for users)
 
 > Set up a docs site for me using the docs.dev template. Follow
-> https://github.com/keyboard-dev/docs.dev/blob/main/LAUNCH.md with
+> https://github.com/keyboard-dev/docs.dev/blob/HEAD/LAUNCH.md with
 > `DOCSDEV_ISSUER=https://app.docs.dev` and my email `<you@example.com>`.
 > Show me the confirmation code right away, and when you're done give me the
 > live URL and the Cloudflare claim link.
@@ -86,7 +86,9 @@ Capture from the output:
 Notes:
 
 - The temporary account lives 60 minutes from the last deploy (each redeploy
-  resets the clock). Don't dawdle between steps.
+  resets the clock). Don't dawdle between steps — and if the user hasn't
+  clicked the claim link as the window runs low, proactively redeploy
+  (`--temporary` again) to reset it rather than letting the site vanish.
 - If the deploy is rejected because of the `ai` binding (Workers AI is not on
   the temporary-account supported list), remove the `"ai"` block from
   `wrangler.jsonc` and deploy again — the editor's "Generate with AI" features

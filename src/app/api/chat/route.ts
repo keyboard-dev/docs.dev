@@ -62,8 +62,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Invalid messages payload.' }, { status: 400 });
   }
 
+  // Page context for anonymous insights — same-origin referer path only,
+  // never the reader's identity.
+  let page = '';
   try {
-    const stream = await streamAssistantAnswer(messages);
+    const ref = new URL(request.headers.get('referer') ?? '');
+    if (ref.origin === new URL(request.url).origin) page = ref.pathname;
+  } catch {
+    // no/invalid referer — log without page context
+  }
+
+  try {
+    const stream = await streamAssistantAnswer(messages, { page });
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',

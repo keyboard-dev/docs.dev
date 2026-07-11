@@ -106,6 +106,9 @@ function Markdown({ text }: { text: string }) {
 
 export function AssistantDialog() {
   const [available, setAvailable] = useState(false);
+  // Admins get floating editor chrome (Edit page, deploy status) in the same
+  // bottom-right corner at a higher z-index — shift the assistant above it.
+  const [admin, setAdmin] = useState(false);
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
@@ -119,6 +122,10 @@ export function AssistantDialog() {
     fetch('/api/chat')
       .then((r) => r.json())
       .then((d) => !cancelled && setAvailable(!!d.available))
+      .catch(() => {});
+    fetch('/api/admin/session')
+      .then((r) => r.json())
+      .then((d) => !cancelled && setAdmin(!!d.admin))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -196,13 +203,15 @@ export function AssistantDialog() {
 
   if (!available) return null;
 
+  const bottom = admin ? 'bottom-[7.5rem]' : 'bottom-5';
+
   return (
     <>
       {!open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full border border-fd-border bg-fd-primary px-4 py-2.5 text-sm font-medium text-fd-primary-foreground shadow-lg transition-transform hover:scale-105"
+          className={`fixed ${bottom} right-5 z-40 flex items-center gap-2 rounded-full border border-fd-border bg-fd-primary px-4 py-2.5 text-sm font-medium text-fd-primary-foreground shadow-lg transition-transform hover:scale-105`}
           aria-label="Ask AI about these docs"
         >
           <MessageCircle className="size-4" />
@@ -210,7 +219,7 @@ export function AssistantDialog() {
         </button>
       )}
       {open && (
-        <div className="fixed bottom-5 right-5 z-40 flex h-[min(560px,80dvh)] w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border border-fd-border bg-fd-popover text-fd-popover-foreground shadow-2xl">
+        <div className={`fixed ${bottom} right-5 z-40 flex h-[min(560px,80dvh)] w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border border-fd-border bg-fd-popover text-fd-popover-foreground shadow-2xl`}>
           <div className="flex items-center justify-between border-b border-fd-border px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <MessageCircle className="size-4" />
