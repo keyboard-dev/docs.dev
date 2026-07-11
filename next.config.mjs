@@ -20,6 +20,15 @@ const config = {
     NEXT_PUBLIC_BUILD_BRANCH: buildInfo.branch,
     NEXT_PUBLIC_BUILD_TIME: buildInfo.builtAt,
   },
+  // Agent-friendly markdown aliases: append `.md` to any docs URL to get the
+  // page as raw markdown (the convention agents and LLM tooling expect).
+  // Serves the same content as /llms.mdx/docs/<slug>/content.md.
+  async rewrites() {
+    return [
+      { source: '/docs.md', destination: '/llms.mdx/docs/content.md' },
+      { source: '/docs/:path*.md', destination: '/llms.mdx/docs/:path*/content.md' },
+    ];
+  },
 };
 
 export default withMDX(config);

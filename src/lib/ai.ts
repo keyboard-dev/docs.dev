@@ -15,12 +15,12 @@
  * Cloudflare bindings.
  */
 
-const TEXT_MODEL = process.env.AI_TEXT_MODEL ?? '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+export const TEXT_MODEL = process.env.AI_TEXT_MODEL ?? '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const IMAGE_MODEL = process.env.AI_IMAGE_MODEL ?? '@cf/black-forest-labs/flux-1-schnell';
 
 export type SearchResult = { title: string; url: string; snippet: string };
 
-type WorkersAI = {
+export type WorkersAI = {
   run(
     model: string,
     input: Record<string, unknown>,
@@ -31,7 +31,7 @@ export function aiMocked(): boolean {
   return process.env.AI_MOCK === '1';
 }
 
-async function workersAI(): Promise<WorkersAI | null> {
+export async function workersAI(): Promise<WorkersAI | null> {
   if (aiMocked()) return null;
   try {
     const { getCloudflareContext } = await import('@opennextjs/cloudflare');

@@ -1,0 +1,73 @@
+---
+title: AI & agent access
+description: Ask AI in the docs, markdown for every page, llms.txt, and a built-in MCP server — your docs are readable by humans and agents alike.
+---
+
+Docs published with docs.dev aren't just a website — they're a corpus that AI
+assistants and coding agents can consume directly. Everything on this page
+ships with every site, no configuration required.
+
+## Ask AI
+
+Every docs site includes an **Ask AI** assistant — the floating button in the
+bottom-right corner of any docs page. It answers questions using only your
+documentation, streams its answers, and links to the pages it used.
+
+Like [AI writing in the editor](/docs/ai), the assistant runs on
+[Workers AI](https://developers.cloudflare.com/workers-ai/) in **your**
+Cloudflare account: no API keys, no per-seat AI pricing, no message quotas
+imposed by us. If the deployment has the `AI` binding (the default
+`wrangler.jsonc` does), the assistant is live; without it, the button simply
+doesn't render.
+
+## Markdown for every page
+
+Append `.md` to any docs URL to get the page as raw markdown — the convention
+agents already expect:
+
+```bash
+curl https://your-site.example/docs/getting-started.md
+```
+
+Every page also has a **copy as markdown** button and view options for opening
+the page directly in AI tools.
+
+## llms.txt
+
+Two standard index files are generated from your content on every build:
+
+- `/llms.txt` — an index of all pages with descriptions, linking to the
+  markdown version of each page.
+- `/llms-full.txt` — the entire docs corpus concatenated as one markdown
+  document, for tools that want everything in a single fetch.
+
+## MCP server
+
+Every site serves a [Model Context Protocol](https://modelcontextprotocol.io)
+endpoint at `/mcp`, so MCP clients can search and read your docs during a
+conversation or coding session. For Claude Code:
+
+```bash
+claude mcp add --transport http my-docs https://your-site.example/mcp
+```
+
+Or in any client that accepts JSON configuration:
+
+```json
+{
+  "mcpServers": {
+    "my-docs": { "url": "https://your-site.example/mcp" }
+  }
+}
+```
+
+The server exposes three tools:
+
+| Tool | What it does |
+| --- | --- |
+| `search_docs` | Search pages by keyword; returns titles, URLs, and snippets. |
+| `read_page` | Fetch one page as markdown by its URL or path. |
+| `list_pages` | List every page with its title and description. |
+
+No authentication is required — the MCP server exposes exactly what the
+public site already serves.

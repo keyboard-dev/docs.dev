@@ -45,6 +45,35 @@ any code change.
 Want a human in the loop? Ask Claude to open a pull request instead, and
 review the docs the way you review code.
 
+## Draft first, publish from the editor
+
+For reviewers who'd rather see a rendered page than a diff, there's a second
+human-in-the-loop path: the repo ships a `/draft-page` skill that writes
+Claude's page into the same shared-drafts store the
+[on-page editor](/docs/editing) uses, instead of committing it to the
+content directory.
+
+```bash
+# > /draft-page Webhooks retry behavior — but I want to review before it ships
+```
+
+Nothing deploys. Instead, anyone signed in to the editor sees the draft
+overlaid on the live site at its future URL — authored by "Claude Code",
+rendered exactly as it will ship. They can polish the wording in place and
+click **Publish** to promote it (a git commit, like any other publish), or
+discard it. AI writes, a human previews and touches up, then promotes —
+with no CMS between them, just a git branch.
+
+### Or review any branch, no skill required
+
+If Claude (or a teammate) simply pushed docs pages to a **branch**, you
+don't need the drafts handshake at all. In the editor sidebar, open
+**Branches…**, pick the branch, and every docs page it adds or changes is
+listed. **Review** loads a page into the editor as a draft: preview it
+rendered, edit it in place, and publish it to the live site — all without
+leaving the docs. The branch itself is never modified; close its pull
+request whenever you're done with it.
+
 ## Agents and humans never fight
 
 The editor, your teammates, and Claude Code all converge on the same source
