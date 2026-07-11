@@ -35,8 +35,42 @@ with `DRAFTS_BRANCH` if the site sets it), one JSON file per page, matching
    **temporarily**, run `pnpm types:check` to validate it, then delete the
    file again — the working tree must be clean; the content ships only as a
    draft.
-3. Save the validated MDX to a scratch file and push it to the drafts
-   branch from a temporary worktree (never switch the main checkout):
+3. Save the validated MDX to a scratch file, then write the draft to the
+   drafts branch. Two paths — prefer the API, fall back to git:
+
+   **Fast path — GitHub API** (use when `gh auth status` succeeds, or a
+   GitHub MCP file-write tool is available). One call writes the file; no
+   clone, no worktree:
+
+   ```bash
+   # Build the draft JSON locally first:
+   node -e '
+     const fs = require("fs");
+     const [, src, slug] = process.argv;  // with -e, args start at argv[1]
+     fs.writeFileSync("/tmp/draft.json", JSON.stringify({
+       slug, content: fs.readFileSync(src, "utf8"),
+       updatedAt: Date.now(), author: "Claude Code",
+     }));
+   ' /tmp/<scratch>.mdx "<slug>"
+
+   # The drafts branch may not exist yet — create it from the default
+   # branch HEAD if needed (mirrors what the server does lazily):
+   gh api repos/{owner}/{repo}/git/ref/heads/docsdev-drafts >/dev/null 2>&1 \
+     || gh api repos/{owner}/{repo}/git/refs -f ref=refs/heads/docsdev-drafts \
+          -f sha="$(gh api repos/{owner}/{repo}/git/ref/heads/main -q .object.sha)"
+
+   # Upsert the file (sha is required only when the draft already exists):
+   SHA=$(gh api "repos/{owner}/{repo}/contents/drafts/<slug>.json?ref=docsdev-drafts" -q .sha 2>/dev/null || true)
+   gh api -X PUT "repos/{owner}/{repo}/contents/drafts/<slug>.json" \
+     -f message="draft: <slug> by Claude Code" -f branch=docsdev-drafts \
+     -f content="$(base64 -w0 /tmp/draft.json)" ${SHA:+-f sha=$SHA}
+   ```
+
+   With a GitHub MCP server instead of `gh`, use its create-or-update-file
+   tool with the same path, branch, and JSON content.
+
+   **Fallback — plain git** (works with nothing but the repo's own
+   credentials; never switches the main checkout):
 
    ```bash
    git fetch origin docsdev-drafts 2>/dev/null \
@@ -44,16 +78,7 @@ with `DRAFTS_BRANCH` if the site sets it), one JSON file per page, matching
      || git worktree add -b docsdev-drafts /tmp/docsdev-drafts \
           "$(git rev-parse --verify --quiet origin/main >/dev/null 2>&1 && echo origin/main || echo HEAD)"
    cd /tmp/docsdev-drafts
-   node -e '
-     const fs = require("fs"), path = require("path");
-     const [, src, slug] = process.argv;  // with -e, args start at argv[1]
-     const file = `drafts/${slug === "" ? "index" : slug}.json`;
-     fs.mkdirSync(path.dirname(file), { recursive: true });
-     fs.writeFileSync(file, JSON.stringify({
-       slug, content: fs.readFileSync(src, "utf8"),
-       updatedAt: Date.now(), author: "Claude Code",
-     }));
-   ' /tmp/<scratch>.mdx "<slug>"
+   mkdir -p "$(dirname "drafts/<slug>.json")" && cp /tmp/draft.json "drafts/<slug>.json"
    git add drafts && git commit -m "draft: <slug> by Claude Code"
    git push -u origin docsdev-drafts
    cd - && git worktree remove /tmp/docsdev-drafts
