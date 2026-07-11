@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
-import { Check, FileJson2, FilePlus2, Files, GitBranch, Palette, Trash2, Upload, X } from 'lucide-react';
+import { Check, FileJson2, FilePlus2, Files, GitBranch, MessagesSquare, Palette, Trash2, Upload, X } from 'lucide-react';
 import { putDraft, deleteDraft } from '@/lib/drafts';
 import { editorName, fetchServerDraft, listServerDrafts, primeEditorName, pushServerDraft, deleteServerDraft } from '@/lib/draft-sync';
 
@@ -43,6 +43,16 @@ function slugify(text: string): string {
 
 type PageRow = { slug: string; draftOnly: boolean; author?: string };
 type BranchPageRow = { slug: string; path: string; status: 'added' | 'modified' };
+type QuestionRow = { id: number; ts: number; page: string; question: string; answered: boolean; sources: number };
+type QuestionStats = { total7d: number; unanswered7d: number };
+
+function relTime(ts: number): string {
+  const s = Math.max(1, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
+}
 
 export function SidebarAdmin() {
   const router = useRouter();
@@ -68,6 +78,11 @@ export function SidebarAdmin() {
   const [specNote, setSpecNote] = useState('');
   const [specBusy, setSpecBusy] = useState(false);
   const specFileRef = useRef<HTMLInputElement>(null);
+  const [questionsOpen, setQuestionsOpen] = useState(false);
+  const [questions, setQuestions] = useState<QuestionRow[] | null>(null);
+  const [questionStats, setQuestionStats] = useState<QuestionStats | null>(null);
+  const [questionsAvailable, setQuestionsAvailable] = useState(true);
+  const [unansweredOnly, setUnansweredOnly] = useState(false);
 
   // Re-apply a locally previewed (unpublished) accent for admins on load.
   useEffect(() => {
@@ -203,6 +218,35 @@ export function SidebarAdmin() {
     };
   }, [admin, rows, router]);
 
+  /* Ask AI insights: recent reader questions (anonymous — no identity is
+     stored) with an unanswered filter. Requires the INSIGHTS D1 binding. */
+  const loadQuestions = useCallback(async (unanswered: boolean) => {
+    setQuestions(null);
+    const res = await fetch(`/api/admin/insights?limit=50${unanswered ? '&unanswered=1' : ''}`);
+    const data = (await res.json().catch(() => ({}))) as {
+      available?: boolean;
+      stats?: QuestionStats;
+      questions?: QuestionRow[];
+    };
+    if (!res.ok) {
+      setQuestions([]);
+      return;
+    }
+    setQuestionsAvailable(data.available !== false);
+    setQuestionStats(data.stats ?? null);
+    setQuestions(data.questions ?? []);
+  }, []);
+
+  const openQuestions = useCallback(async () => {
+    setOpen(false);
+    setThemeOpen(false);
+    setBranchesOpen(false);
+    setSpecsOpen(false);
+    setQuestionsOpen((o) => !o);
+    setUnansweredOnly(false);
+    await loadQuestions(false);
+  }, [loadQuestions]);
+
   /* OpenAPI specs: list openapi/*.json, upload a new/updated spec (committed
      to the deploy branch — the build regenerates the API reference from it),
      and delete specs. */
@@ -210,6 +254,7 @@ export function SidebarAdmin() {
     setOpen(false);
     setThemeOpen(false);
     setBranchesOpen(false);
+    setQuestionsOpen(false);
     setSpecNote('');
     setSpecsOpen((o) => !o);
     setSpecs(null);
@@ -267,6 +312,7 @@ export function SidebarAdmin() {
     setOpen(false);
     setThemeOpen(false);
     setSpecsOpen(false);
+    setQuestionsOpen(false);
     setBranchNote('');
     setBranch(null);
     setBranchPages(null);
@@ -380,6 +426,7 @@ export function SidebarAdmin() {
                 setThemeOpen(false);
                 setBranchesOpen(false);
                 setSpecsOpen(false);
+                setQuestionsOpen(false);
                 setOpen((o) => !o);
                 void refresh();
               }}
@@ -424,10 +471,25 @@ export function SidebarAdmin() {
               <FileJson2 size={14} /> API specs…
             </button>
             <button
+              onClick={() => void openQuestions()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px',
+                border: 'none', borderRadius: 8, background: 'transparent',
+                color: 'var(--color-fd-muted-foreground)', fontSize: 13.5, fontWeight: 500,
+                cursor: 'pointer', textAlign: 'left',
+                fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-fd-accent)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <MessagesSquare size={14} /> Questions…
+            </button>
+            <button
               onClick={() => {
                 setOpen(false);
                 setBranchesOpen(false);
                 setSpecsOpen(false);
+                setQuestionsOpen(false);
                 setThemeOpen((o) => !o);
               }}
               style={{
@@ -538,6 +600,95 @@ export function SidebarAdmin() {
               {themeNote}
             </div>
           )}
+        </div>
+      )}
+
+      {questionsOpen && (
+        <div
+          className="dd-pop"
+          style={{
+            position: 'fixed', left: 16, bottom: 64, zIndex: 95, width: 340,
+            maxHeight: '60vh', display: 'flex', flexDirection: 'column',
+            fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--color-fd-border)' }}>
+            <MessagesSquare size={13} style={{ color: 'var(--color-fd-muted-foreground)' }} />
+            <strong style={{ fontSize: 13.5, flex: 1 }}>Questions</strong>
+            {questionStats && questionsAvailable && (
+              <span style={{ fontSize: 11.5, color: 'var(--color-fd-muted-foreground)' }}>
+                7d: {questionStats.total7d} · {questionStats.unanswered7d} unanswered
+              </span>
+            )}
+            <button onClick={() => setQuestionsOpen(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-fd-muted-foreground)', display: 'flex' }}>
+              <X size={14} />
+            </button>
+          </div>
+
+          {questionsAvailable && (
+            <div style={{ display: 'flex', gap: 4, padding: '8px 10px', borderBottom: '1px solid var(--color-fd-border)' }}>
+              {([['All', false], ['Unanswered', true]] as const).map(([label, val]) => (
+                <button
+                  key={label}
+                  onClick={() => {
+                    setUnansweredOnly(val);
+                    void loadQuestions(val);
+                  }}
+                  style={{
+                    height: 24, padding: '0 10px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
+                    border: '1px solid var(--color-fd-border)',
+                    background: unansweredOnly === val ? ACCENT : 'transparent',
+                    color: unansweredOnly === val ? '#fff' : 'var(--color-fd-muted-foreground)',
+                    fontWeight: 600,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div style={{ overflowY: 'auto', padding: 6 }}>
+            {!questionsAvailable && (
+              <div style={{ padding: 10, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)' }}>
+                Insights are off — nothing is being logged. Add the <code>INSIGHTS</code> D1 binding in{' '}
+                <code>wrangler.jsonc</code> (one <code>wrangler d1 create</code>) to see what readers ask.
+              </div>
+            )}
+            {questionsAvailable &&
+              (questions ?? []).map((row) => (
+                <div key={row.id} style={{ padding: '7px 8px', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, lineHeight: 1.35 }}>{row.question}</div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 3, fontSize: 11, color: 'var(--color-fd-muted-foreground)' }}>
+                    <span
+                      title={row.answered ? `Retrieval matched ${row.sources} page${row.sources === 1 ? '' : 's'}` : 'No docs matched this question'}
+                      style={{
+                        width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                        background: row.answered ? 'var(--color-fd-success, #15803d)' : ACCENT,
+                      }}
+                    />
+                    <span>{relTime(row.ts)}</span>
+                    {row.page && (
+                      <a href={row.page} style={{ color: 'inherit', textDecoration: 'underline', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {row.page}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            {questionsAvailable && questions === null && (
+              <div style={{ padding: 10, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)' }}>Loading…</div>
+            )}
+            {questionsAvailable && questions?.length === 0 && (
+              <div style={{ padding: 10, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)' }}>
+                {unansweredOnly ? 'No unanswered questions — the docs are keeping up.' : 'No questions logged yet.'}
+              </div>
+            )}
+          </div>
+
+          <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-fd-border)', fontSize: 11.5, color: 'var(--color-fd-muted-foreground)' }}>
+            Anonymous by design: question, page, and time only — no reader identity. Pruned after 90 days.
+          </div>
         </div>
       )}
 

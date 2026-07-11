@@ -14,6 +14,7 @@
 
 import { aiMocked, TEXT_MODEL, workersAI } from '@/lib/ai';
 import { findDocPage, searchDocPages, type DocSearchResult } from '@/lib/docs-index';
+import { logQuestion } from '@/lib/insights';
 import { getLLMText, source } from '@/lib/source';
 import { appName } from '@/lib/shared';
 
@@ -79,9 +80,16 @@ function mockStream(question: string, sources: DocSearchResult[]): ReadableStrea
 }
 
 /** Answer a chat, returning an SSE byte stream (sources event, then tokens). */
-export async function streamAssistantAnswer(messages: ChatMessage[]): Promise<ReadableStream<Uint8Array>> {
+export async function streamAssistantAnswer(
+  messages: ChatMessage[],
+  opts: { page?: string } = {},
+): Promise<ReadableStream<Uint8Array>> {
   const question = messages.filter((m) => m.role === 'user').at(-1)?.content ?? '';
   const { sources, context } = await buildContext(question);
+
+  // Anonymous insights (question, page, sources found — no reader identity);
+  // see lib/insights.ts. Best-effort: never blocks or breaks the answer.
+  void logQuestion({ page: opts.page ?? '', question, sources: sources.length }).catch(() => {});
 
   if (aiMocked()) return mockStream(question, sources);
 
