@@ -210,7 +210,7 @@ export function AssistantDialog() {
         </button>
       )}
       {open && (
-        <div className="fixed bottom-5 right-5 z-40 flex h-[min(560px,80vh)] w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border border-fd-border bg-fd-popover text-fd-popover-foreground shadow-2xl">
+        <div className="fixed bottom-5 right-5 z-40 flex h-[min(560px,80dvh)] w-[min(400px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border border-fd-border bg-fd-popover text-fd-popover-foreground shadow-2xl">
           <div className="flex items-center justify-between border-b border-fd-border px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <MessageCircle className="size-4" />
@@ -286,7 +286,7 @@ export function AssistantDialog() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about these docs…"
-              className="min-w-0 flex-1 rounded-lg border border-fd-border bg-transparent px-3 py-2 text-sm outline-none focus:border-fd-primary"
+              className="min-w-0 flex-1 rounded-lg border border-fd-border bg-transparent px-3 py-2 text-base outline-none focus:border-fd-primary sm:text-sm"
               maxLength={4000}
             />
             <button

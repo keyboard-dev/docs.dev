@@ -40,6 +40,16 @@ Conventions:
 - Put images in `public/uploads/` and reference them as `/uploads/name.png`.
 - After adding/removing/renaming a page, update `content/docs/meta.json`.
 
+## Drafts: review-before-publish
+
+Committing to the default branch publishes immediately. When the user wants
+to review a page before it goes live ("draft this", "let me look first"),
+do NOT commit to `content/docs/` — use the `/draft-page` skill instead. It
+writes the page as `drafts/<slug>.json` on the `docsdev-drafts` branch (the
+shared-drafts store behind the in-site editor), where a human can preview
+the rendered page at `/docs/<slug>`, touch it up in place, and publish or
+discard it from the editor.
+
 ## Commands
 
 ```bash
