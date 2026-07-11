@@ -10,6 +10,11 @@ the repo is yours: edit it by hand, in the GitHub UI, or point
 [Claude Code](https://claude.com/claude-code) at it — the repo ships a
 `CLAUDE.md` and skills so an agent is productive immediately.
 
+No Cloudflare account? A coding agent can launch this template for you on a
+temporary Cloudflare account and sign you up for docs.dev along the way — you
+confirm a code and click one claim link. See **[LAUNCH.md](LAUNCH.md)** for
+the copy-paste prompt and the agent playbook.
+
 docs.dev is a documentation framework built on [Fumadocs](https://fumadocs.dev)
 (Next.js + MDX) with one thing no other docs tool has: a reading experience
 powered by [pretext](https://github.com/chenglou/pretext), chenglou's
