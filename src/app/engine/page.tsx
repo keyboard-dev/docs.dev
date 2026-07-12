@@ -2,7 +2,7 @@ import { PageFlow } from '@/components/pretext/page-flow';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'docs.dev — the layout engine',
+  title: 'The layout engine',
   description: 'A whole page laid out as a flowing column: prose wraps around a figure, code stays intact.',
 };
 

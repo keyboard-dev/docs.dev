@@ -64,7 +64,7 @@ export function Orb() {
         height: '100%',
         borderRadius: '50%',
         background:
-          'radial-gradient(125% 125% at 30% 24%, #f6b079 0%, #e07a2c 38%, #c2571f 64%, #8f3d12 100%)',
+          'radial-gradient(125% 125% at 30% 24%, #c7d2fe 0%, #818cf8 38%, #6366f1 64%, #312e81 100%)',
         boxShadow: '0 12px 34px rgba(170,75,22,0.30), inset 0 1px 0 rgba(255,255,255,0.45)',
       }}
     />
