@@ -16,7 +16,10 @@ export default function Layout({ children }: LayoutProps<'/'>) {
         <link rel="preload" href="/fonts/geist-pixel-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
       <body className="flex flex-col min-h-screen">
-        <RootProvider>{children}</RootProvider>
+        {/* Dark-first: the brand scheme is deep navy + indigo (see
+            global.css); readers can still flip to light from the theme
+            toggle. */}
+        <RootProvider theme={{ defaultTheme: 'dark' }}>{children}</RootProvider>
       </body>
     </html>
   );

@@ -27,8 +27,8 @@ const orb: Obstacle = {
         width: '100%',
         height: '100%',
         borderRadius: '50%',
-        background: 'radial-gradient(circle at 35% 30%, #ffb27a 0%, #e8753b 35%, #7a2d12 100%)',
-        boxShadow: '0 0 60px 12px rgba(232,117,59,0.45), inset -16px -20px 50px rgba(0,0,0,0.45)',
+        background: 'radial-gradient(circle at 35% 30%, #a5b4fc 0%, #6366f1 40%, #1e1b4b 100%)',
+        boxShadow: '0 0 70px 14px rgba(99,102,241,0.45), inset -16px -20px 50px rgba(0,0,0,0.5)',
       }}
     />
   ),
@@ -108,8 +108,9 @@ export default function HomePage() {
   return (
     <main className="mx-auto w-full max-w-[860px] px-6 pb-28">
       {/* Hero */}
-      <section className="pt-20 pb-14">
-        <p className="mb-3 font-mono text-[13px] uppercase tracking-[0.14em] text-[#e8753b]">
+      <section className="relative pt-20 pb-14">
+        <div className="docsdev-glow" aria-hidden />
+        <p className="relative mb-3 font-mono text-[13px] uppercase tracking-[0.14em] text-[#818cf8]">
           Your repo · Your Cloudflare · Our reading experience
         </p>
         <h1 className="m-0 text-[44px] font-extrabold leading-[1.05] tracking-[-0.02em] sm:text-[56px]">
@@ -125,13 +126,13 @@ export default function HomePage() {
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <a
             href={DEPLOY_URL}
-            className="rounded-xl bg-[#e8753b] px-5 py-3 text-[15px] font-semibold text-white no-underline transition-colors hover:bg-[#d3652e]"
+            className="rounded-full bg-[#1c1a2e] px-6 py-3 text-[15px] font-semibold text-white no-underline shadow-[0_0_24px_rgba(99,102,241,0.35)] transition-transform hover:scale-[1.02] dark:bg-white dark:text-[#0a0a14]"
           >
             Deploy to Cloudflare
           </a>
           <Link
             href="/docs"
-            className="rounded-xl border border-fd-border px-5 py-3 text-[15px] font-semibold no-underline transition-colors hover:bg-fd-accent"
+            className="rounded-full border border-fd-border px-6 py-3 text-[15px] font-semibold no-underline transition-colors hover:bg-fd-accent"
           >
             Read the docs
           </Link>
@@ -180,13 +181,13 @@ export default function HomePage() {
         <div className="mt-6 flex justify-center gap-3">
           <a
             href={DEPLOY_URL}
-            className="rounded-xl bg-[#e8753b] px-5 py-3 text-[15px] font-semibold text-white no-underline transition-colors hover:bg-[#d3652e]"
+            className="rounded-full bg-[#1c1a2e] px-6 py-3 text-[15px] font-semibold text-white no-underline shadow-[0_0_24px_rgba(99,102,241,0.35)] transition-transform hover:scale-[1.02] dark:bg-white dark:text-[#0a0a14]"
           >
             Deploy to Cloudflare
           </a>
           <Link
             href="/docs/getting-started"
-            className="rounded-xl border border-fd-border px-5 py-3 text-[15px] font-semibold no-underline transition-colors hover:bg-fd-accent"
+            className="rounded-full border border-fd-border px-6 py-3 text-[15px] font-semibold no-underline transition-colors hover:bg-fd-accent"
           >
             Getting started
           </Link>
