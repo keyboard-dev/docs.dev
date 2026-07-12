@@ -55,12 +55,20 @@
   //   TAVILY_API_KEY or BRAVE_API_KEY — optional web search grounding for
   //                                "Generate with AI" (skipped when unset)
   // The ONE field the Deploy to Cloudflare button asks about. Creating a
-  // site at app.docs.dev first hands you a one-time setup token (dst_…) —
-  // paste it here during the button flow and the deployed site binds itself
-  // to your team automatically. Leave blank if you didn't start there
-  // (connect later from /admin instead).
-  "vars": {
-    "DOCSDEV_SITE_TOKEN": ""
+  // site at app.docs.dev first hands you a site token (dst_…) — paste it in
+  // during the button flow and the deployed site binds itself to your team
+  // automatically. Leave blank if you didn't start there (connect later
+  // from /admin instead).
+  //
+  // Declared as a SECRET, not a var: after the first claim the token
+  // becomes this Worker's durable credential (it's what lets the Worker
+  // request approval for custom domains you add later, with no re-pasting),
+  // so it must not be readable by every dashboard member or workers-read
+  // API token. Secrets are write-only after creation; the code reads
+  // process.env.DOCSDEV_SITE_TOKEN either way, and .dev.vars works locally.
+  // Set or rotate it any time with: npx wrangler secret put DOCSDEV_SITE_TOKEN
+  "secrets": {
+    "required": ["DOCSDEV_SITE_TOKEN"]
   },
   //
   // Otherwise zero-config — the button prompts for nothing else:
