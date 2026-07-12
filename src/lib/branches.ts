@@ -16,7 +16,13 @@
 import { gitConfig } from './shared';
 import { resolveBranch } from './github-branch';
 
-export type BranchInfo = { name: string };
+export type BranchInfo = {
+  name: string;
+  /** No commits ahead of the default branch — merged or empty. */
+  merged: boolean;
+  /** Number of docs content files (content/docs/**.mdx, content/landing.mdx) changed vs the default branch. */
+  docChanges: number;
+};
 export type BranchPage = { slug: string; path: string; status: 'added' | 'modified' };
 
 const GH_HEADERS = {
@@ -56,13 +62,37 @@ editor for review.
 /** Branch names that make sense to review — everything except the deploy
  *  branch and the drafts store itself. */
 export async function listReviewableBranches(token: string): Promise<BranchInfo[]> {
-  if (branchContentMocked()) return [{ name: MOCK_BRANCH }];
+  if (branchContentMocked()) return [{ name: MOCK_BRANCH, merged: false, docChanges: 1 }];
   const base = await resolveBranch(token);
   const res = await fetch(api('/branches?per_page=100'), { headers: { ...GH_HEADERS, Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`Cannot list branches (${res.status})`);
   const branches = (await res.json()) as Array<{ name: string }>;
   const drafts = process.env.DRAFTS_BRANCH ?? 'docsdev-drafts';
-  return branches.filter((b) => b.name !== base && b.name !== drafts).map((b) => ({ name: b.name }));
+  const names = branches
+    .filter((b) => b.name !== base && b.name !== drafts)
+    .map((b) => b.name)
+    .slice(0, 50); // one compare call per branch — cap the fan-out
+
+  // One compare per branch answers both review questions: is there anything
+  // unmerged (ahead_by), and does any of it touch docs content?
+  return Promise.all(
+    names.map(async (name): Promise<BranchInfo> => {
+      try {
+        const cmp = await fetch(
+          api(`/compare/${encodeURIComponent(base)}...${encodeURIComponent(name)}`),
+          { headers: { ...GH_HEADERS, Authorization: `Bearer ${token}` } },
+        );
+        if (!cmp.ok) return { name, merged: false, docChanges: 0 };
+        const data = (await cmp.json()) as { ahead_by?: number; files?: Array<{ filename: string }> };
+        const docChanges = (data.files ?? []).filter(
+          (f) => /^content\/docs\/.+\.mdx$/.test(f.filename) || f.filename === 'content/landing.mdx',
+        ).length;
+        return { name, merged: (data.ahead_by ?? 0) === 0, docChanges };
+      } catch {
+        return { name, merged: false, docChanges: 0 };
+      }
+    }),
+  );
 }
 
 /** Docs pages added or modified on `branch` relative to the default branch. */
