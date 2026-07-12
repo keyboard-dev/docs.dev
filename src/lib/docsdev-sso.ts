@@ -81,8 +81,11 @@ const CLAIM_RETRY_MS = 60_000;
 async function claimHostWithSiteToken(
   host: string,
 ): Promise<{ siteId: string | null; pending: boolean }> {
+  // Anything that isn't a dst_… token counts as unset — in particular the
+  // "unset" placeholder scripts/cf-deploy.mjs seeds so that deploys succeed
+  // before a real token exists.
   const token = process.env.DOCSDEV_SITE_TOKEN;
-  if (!token) return { siteId: null, pending: false };
+  if (!token?.startsWith('dst_')) return { siteId: null, pending: false };
 
   const cached = claimCache.get(host);
   if (cached && cached.expires > Date.now()) return cached;
