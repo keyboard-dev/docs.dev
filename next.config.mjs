@@ -1,7 +1,12 @@
 import { createMDX } from 'fumadocs-mdx/next';
 import { generateApiDocs } from './scripts/generate-api-docs.mjs';
 import { generateContentManifest } from './scripts/gen-content-manifest.mjs';
+import { generateRepoInfo } from './scripts/gen-repo-info.mjs';
 import { getBuildInfo } from './scripts/build-info.mjs';
+
+// Detect which GitHub repo this checkout is (Deploy-to-Cloudflare copies,
+// moved clones) so the editor publishes to the right place with zero config.
+generateRepoInfo();
 
 // Regenerate the API reference from the committed OpenAPI specs, so uploading
 // a spec (a one-file commit) is all it takes — the pages follow at build time.

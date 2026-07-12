@@ -2,7 +2,8 @@
  * Admin sessions + content helpers.
  *
  * Three ways in, one session model:
- *   - docs.dev sign-in (recommended): set DOCSDEV_SITE_ID and sessions are
+ *   - docs.dev sign-in (recommended): connect the site to docs.dev (or set
+ *     DOCSDEV_SITE_ID) and sessions are
  *     short-lived JWTs issued by the docs.dev service after it verifies the
  *     user is a member of your team (see lib/docsdev-sso.ts). When SSO is
  *     configured, the other paths are disabled entirely — a leftover PIN or
@@ -29,7 +30,7 @@
 import { cookies } from 'next/headers';
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { getDocSource, listDocSlugs } from './content';
-import { ssoEnabled, verifySsoToken, SSO_JWT_COOKIE } from './docsdev-sso';
+import { ssoActive, verifySsoToken, SSO_JWT_COOKIE } from './docsdev-sso';
 
 const COOKIE = 'docsdev_admin';
 const ADMIN_PIN = process.env.ADMIN_PIN || null;
@@ -140,7 +141,7 @@ export const SESSION_MAX_AGE_S = 60 * 60 * 8;
  */
 export async function readSession(): Promise<Session | null> {
   const store = await cookies();
-  if (ssoEnabled()) {
+  if (await ssoActive()) {
     const token = store.get(SSO_JWT_COOKIE)?.value;
     if (!token) return null;
     const sso = await verifySsoToken(token);
