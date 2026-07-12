@@ -173,6 +173,32 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, 
     setMode('preview');
   }, [getCurrent]);
 
+  const [branching, setBranching] = useState(false);
+  // Promote the draft to a real git branch — the deliberate "share this WIP"
+  // step. The draft itself stays; the branch is a snapshot with a one-click
+  // PR link.
+  const toBranch = useCallback(async () => {
+    commitFocused();
+    setBranching(true);
+    try {
+      const res = await fetch('/api/admin/branches', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug, content: getCurrent() }),
+      });
+      const data = (await res.json()) as { ok?: boolean; branch?: string; compareUrl?: string; error?: string };
+      if (data.ok && data.compareUrl) {
+        window.open(data.compareUrl, '_blank', 'noopener');
+      } else {
+        window.alert(data.error ?? 'Could not create the branch.');
+      }
+    } catch {
+      window.alert('Could not create the branch.');
+    } finally {
+      setBranching(false);
+    }
+  }, [slug, getCurrent]);
+
   const onDiscard = useCallback(() => {
     if (!window.confirm('Discard your local draft and return to the published version?')) return;
     void discard();
@@ -242,6 +268,14 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, 
           </span>
         )}
         <button onClick={onDiscard} style={ghost}>Discard</button>
+        <button
+          onClick={() => void toBranch()}
+          disabled={branching}
+          style={{ ...ghost, opacity: branching ? 0.6 : 1 }}
+          title="Snapshot this draft to a new git branch and open a pull request — share it without publishing"
+        >
+          {branching ? 'Branching…' : 'To branch'}
+        </button>
         <button
           onClick={() => {
             commitFocused();
