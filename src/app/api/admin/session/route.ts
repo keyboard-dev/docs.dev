@@ -1,21 +1,24 @@
 import { NextResponse } from 'next/server';
 import { pinAuthConfigured, readSession } from '@/lib/admin';
 import { githubOAuthConfigured } from '@/lib/github-auth';
-import { requestHost, ssoActive, ssoIssuer } from '@/lib/docsdev-sso';
+import { requestHost, resolveSiteAccess, ssoIssuer } from '@/lib/docsdev-sso';
 
 // Lightweight check the client uses to decide whether to show in-app editing,
 // which sign-in methods are available (for the /admin sign-in UI), and the
 // editor's identity (for draft attribution). Keeping this client-driven means
 // docs pages stay static (no cookie read at render time).
 export async function GET() {
-  const sso = await ssoActive();
+  const { siteId, pendingApproval } = await resolveSiteAccess();
+  const sso = siteId !== null;
   const session = await readSession();
 
   // Nothing configured at all → offer the docs.dev connect ceremony: the
   // owner proves Worker ownership via Cloudflare OAuth over there, and this
-  // site picks the registration up through the runtime lookup.
+  // site picks the registration up through the runtime lookup. (Not when
+  // this hostname is already waiting on a dashboard approval — connecting
+  // it as a NEW site is exactly the wrong move then.)
   let connect: string | null = null;
-  if (!sso && !githubOAuthConfigured() && !pinAuthConfigured()) {
+  if (!sso && !pendingApproval && !githubOAuthConfigured() && !pinAuthConfigured()) {
     const host = await requestHost();
     if (host) connect = `${ssoIssuer()}/connect?host=${encodeURIComponent(host)}`;
   }
@@ -36,5 +39,9 @@ export async function GET() {
     githubOAuth: !sso && githubOAuthConfigured(),
     pinConfigured: sso || pinAuthConfigured(),
     connect,
+    // This hostname was proposed to docs.dev (custom domain added in
+    // Cloudflare) and is waiting for an org admin's approval.
+    pendingApproval,
+    dashboard: pendingApproval ? `${ssoIssuer()}/dashboard` : null,
   });
 }

@@ -92,9 +92,13 @@ API using your `GITHUB_PAT` secret).
 Team sign-in, two ways:
 
 - **Starting at [app.docs.dev](https://app.docs.dev)** (smoothest): create a
-  site in the dashboard, paste its one-time setup token into the button's
+  site in the dashboard, paste its site token into the button's
   `DOCSDEV_SITE_TOKEN` field, and the deployed site binds itself to your
-  team on first boot — nothing else to do.
+  team on first boot — nothing else to do. The token stays with the Worker
+  as a secret and becomes its durable credential: add a custom domain in
+  Cloudflare later, open `/admin` on it, and it appears in your dashboard
+  for one-click approval — no re-pasting. Think it leaked? Rotate it from
+  the site card, then `npx wrangler secret put DOCSDEV_SITE_TOKEN`.
 - **Already deployed?** Open `/admin` and click **Connect this site to
   docs.dev** — ownership is verified through your Cloudflare account and
   takes effect within seconds, no redeploy.

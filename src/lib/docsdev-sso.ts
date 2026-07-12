@@ -55,67 +55,113 @@ const POSITIVE_TTL_MS = 5 * 60_000;
 const NEGATIVE_TTL_MS = 15_000;
 
 // docs.dev-first onboarding: when the site was created in the docs.dev
-// dashboard before this Worker existed, the user pasted a one-time setup
-// token into the Deploy button's DOCSDEV_SITE_TOKEN field. This Worker is
-// the only party that knows both the token and its real hostname, so it
-// redeems the token once — binding this host to the pending site. Single
-// attempt per isolate; after success the ordinary lookup takes over (and
-// the burned token is ignored forever).
+// dashboard before this Worker existed, the user pasted a site token
+// (dst_…) into the Deploy button's DOCSDEV_SITE_TOKEN field. This Worker
+// is the only party that knows both the token and its real hostname, so it
+// redeems the token on the first lookup miss — binding this host to the
+// pending site.
+//
+// The token is durable, not single-use: it stays in the Worker (as a
+// secret) as this deployment's identity. When the user later adds a custom
+// domain in Cloudflare, traffic on the new hostname misses the lookup, the
+// claim retries with the same token, and docs.dev records the host as a
+// PENDING join request — sign-in on the new domain starts working the
+// moment an org admin clicks Approve in the dashboard. Claim outcomes are
+// cached per host so we don't hammer the endpoint on every negative-lookup
+// expiry while an approval sits in someone's dashboard.
 //
 // This must only ever run from genuinely dynamic contexts (route handlers
 // like /api/admin/session) — resolveSiteId reads request headers, and a
 // statically prerendered page that touches a dynamic API at runtime is a
 // hard Next error ("Page changed from static to dynamic"), which took the
 // whole site down when this briefly lived in the root layout.
-let claimAttempted = false;
+const claimCache = new Map<string, { siteId: string | null; pending: boolean; expires: number }>();
+const CLAIM_RETRY_MS = 60_000;
 
-async function claimHostWithSetupToken(host: string): Promise<string | null> {
+async function claimHostWithSiteToken(
+  host: string,
+): Promise<{ siteId: string | null; pending: boolean }> {
   const token = process.env.DOCSDEV_SITE_TOKEN;
-  if (!token || claimAttempted) return null;
-  claimAttempted = true;
+  if (!token) return { siteId: null, pending: false };
+
+  const cached = claimCache.get(host);
+  if (cached && cached.expires > Date.now()) return cached;
+
+  let outcome: { siteId: string | null; pending: boolean } = { siteId: null, pending: false };
   try {
     const res = await fetch(new URL('/api/v1/sites/claim-host', ssoIssuer()), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ setup_token: token, host }),
     });
-    if (!res.ok) return null; // burned/expired token — the lookup is the truth
-    return ((await res.json()) as { site_id?: string }).site_id ?? null;
+    if (res.ok) {
+      const body = (await res.json()) as { site_id?: string; status?: string };
+      outcome =
+        body.status === 'pending_approval'
+          ? { siteId: null, pending: true } // approval flips the lookup, not this call
+          : { siteId: body.site_id ?? null, pending: false };
+    }
+    // Non-ok (rotated token, host taken, …) caches as a plain miss — the
+    // lookup stays the source of truth either way.
+    claimCache.set(host, { ...outcome, expires: Date.now() + CLAIM_RETRY_MS });
   } catch {
-    claimAttempted = false; // issuer unreachable — worth retrying later
-    return null;
+    // issuer unreachable — no cache entry, retry on the next lookup miss
   }
+  return outcome;
+}
+
+export interface SiteAccess {
+  siteId: string | null;
+  /** This hostname was proposed to docs.dev and awaits an admin's approval. */
+  pendingApproval: boolean;
 }
 
 /**
- * The site id this deployment should authenticate as: DOCSDEV_SITE_ID if
- * set, else the runtime hostname lookup. Null means SSO is not configured
+ * The site id this deployment should authenticate as (DOCSDEV_SITE_ID if
+ * set, else the runtime hostname lookup), plus whether this hostname is
+ * sitting in the docs.dev dashboard as a pending join request. A null
+ * siteId with pendingApproval false means SSO is not configured
  * (standalone PIN / GitHub auth applies).
  */
-export async function resolveSiteId(): Promise<string | null> {
-  if (process.env.DOCSDEV_SITE_ID) return process.env.DOCSDEV_SITE_ID;
+export async function resolveSiteAccess(): Promise<SiteAccess> {
+  if (process.env.DOCSDEV_SITE_ID) {
+    return { siteId: process.env.DOCSDEV_SITE_ID, pendingApproval: false };
+  }
 
   const host = await requestHost();
-  if (!host) return null;
+  if (!host) return { siteId: null, pendingApproval: false };
 
   const cached = siteIdCache.get(host);
-  if (cached && cached.expires > Date.now()) return cached.siteId;
+  if (cached && cached.expires > Date.now() && cached.siteId) {
+    return { siteId: cached.siteId, pendingApproval: false };
+  }
 
   let siteId: string | null = null;
-  try {
-    const res = await fetch(new URL(`/api/v1/sites/lookup?host=${host}`, ssoIssuer()));
-    if (res.ok) {
-      siteId = ((await res.json()) as { site_id?: string }).site_id ?? null;
+  if (!cached || cached.expires <= Date.now()) {
+    try {
+      const res = await fetch(new URL(`/api/v1/sites/lookup?host=${host}`, ssoIssuer()));
+      if (res.ok) {
+        siteId = ((await res.json()) as { site_id?: string }).site_id ?? null;
+      }
+    } catch {
+      siteId = null; // issuer unreachable — treat as unconfigured, retry soon
     }
-  } catch {
-    siteId = null; // issuer unreachable — treat as unconfigured, retry soon
+    siteIdCache.set(host, {
+      siteId,
+      expires: Date.now() + (siteId ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS),
+    });
   }
-  if (!siteId) siteId = await claimHostWithSetupToken(host);
-  siteIdCache.set(host, {
-    siteId,
-    expires: Date.now() + (siteId ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS),
-  });
-  return siteId;
+  if (siteId) return { siteId, pendingApproval: false };
+
+  const claimed = await claimHostWithSiteToken(host);
+  if (claimed.siteId) {
+    siteIdCache.set(host, { siteId: claimed.siteId, expires: Date.now() + POSITIVE_TTL_MS });
+  }
+  return { siteId: claimed.siteId, pendingApproval: claimed.pending };
+}
+
+export async function resolveSiteId(): Promise<string | null> {
+  return (await resolveSiteAccess()).siteId;
 }
 
 export async function ssoActive(): Promise<boolean> {

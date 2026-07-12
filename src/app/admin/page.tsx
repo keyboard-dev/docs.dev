@@ -16,6 +16,8 @@ export default function AdminPage() {
   const [pinConfigured, setPinConfigured] = useState(true); // assume true until checked, to avoid a flash
   const [ghAvailable, setGhAvailable] = useState(false);
   const [connectUrl, setConnectUrl] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState(false);
+  const [dashboardUrl, setDashboardUrl] = useState<string | null>(null);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [user, setUser] = useState<{ method: string; login: string; name: string; avatar: string } | null>(null);
@@ -30,6 +32,8 @@ export default function AdminPage() {
         setGhAvailable(!!d.githubOAuth);
         setPinConfigured(d.pinConfigured !== false);
         setConnectUrl(typeof d.connect === 'string' ? d.connect : null);
+        setPendingApproval(!!d.pendingApproval);
+        setDashboardUrl(typeof d.dashboard === 'string' ? d.dashboard : null);
         setUser(d.user ?? null);
       })
       .catch(() => {});
@@ -92,7 +96,24 @@ export default function AdminPage() {
     return (
       <main style={shell}>
         <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>docs.dev admin</h1>
-        {nothingConfigured ? (
+        {pendingApproval ? (
+          <>
+            <p style={{ background: '#fdf6e6', border: '1px solid #e8d29a', color: '#7a5c12', borderRadius: 10, padding: '12px 16px', fontSize: 14, marginBottom: 20 }}>
+              ⏳ This domain is waiting for approval. It asked to join your docs.dev site — a
+              team admin just needs to approve it from the dashboard, then refresh this page.
+            </p>
+            {dashboardUrl && (
+              <a
+                href={dashboardUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ ...field, display: 'inline-block', border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, textDecoration: 'none', marginBottom: 20 }}
+              >
+                Open the docs.dev dashboard →
+              </a>
+            )}
+          </>
+        ) : nothingConfigured ? (
           connectUrl ? (
             <>
               <p style={{ color: '#8a857a', marginBottom: 20 }}>
