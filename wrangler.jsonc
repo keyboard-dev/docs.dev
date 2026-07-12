@@ -64,9 +64,15 @@
   // becomes this Worker's durable credential (it's what lets the Worker
   // request approval for custom domains you add later, with no re-pasting),
   // so it must not be readable by every dashboard member or workers-read
-  // API token. Secrets are write-only after creation; the code reads
+  // API token — and unlike a config var, a secret survives every future
+  // push-to-deploy. Secrets are write-only after creation; the code reads
   // process.env.DOCSDEV_SITE_TOKEN either way, and .dev.vars works locally.
   // Set or rotate it any time with: npx wrangler secret put DOCSDEV_SITE_TOKEN
+  //
+  // wrangler refuses to deploy while a required secret is unset, which
+  // would strand users who skipped the token (they connect from /admin
+  // instead) — scripts/cf-deploy.mjs closes that gap by seeding the
+  // placeholder "unset" (ignored by the app) when no value exists yet.
   "secrets": {
     "required": ["DOCSDEV_SITE_TOKEN"]
   },

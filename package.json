@@ -10,9 +10,9 @@
     "postinstall": "fumadocs-mdx",
     "lint": "eslint",
     "cf:build": "opennextjs-cloudflare build",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "deploy": "opennextjs-cloudflare build && node scripts/cf-deploy.mjs",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:deploy": "opennextjs-cloudflare build && node scripts/cf-deploy.mjs",
     "generate:api": "node scripts/generate-api-docs.mjs"
   },
   "dependencies": {
