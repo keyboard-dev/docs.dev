@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: 'Received an invalid session token.' }, { status: 502 });
   }
 
-  const res = NextResponse.redirect(new URL('/admin', request.url), 302);
+  const res = NextResponse.redirect(new URL('/docs', request.url), 302);
   res.cookies.set(SSO_JWT_COOKIE, accessToken, {
     httpOnly: true,
     sameSite: 'lax',

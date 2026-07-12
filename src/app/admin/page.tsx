@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * /admin — sign-in + page picker. Editing itself happens in the one unified
- * editor (on-page, or /admin/edit), so this is just the way in: sign in with
- * docs.dev (team mode), GitHub, or the PIN — then pick a page to edit.
+ * /admin — sign-in + account. Editing happens in place on the site (open any
+ * page and hit "Edit page"), so signing in lands you straight on the docs;
+ * visiting /admin while signed in just offers "open your docs" and sign-out.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -17,7 +17,6 @@ export default function AdminPage() {
   const [ghAvailable, setGhAvailable] = useState(false);
   const [connectUrl, setConnectUrl] = useState<string | null>(null);
   const [pin, setPin] = useState('');
-  const [pages, setPages] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [user, setUser] = useState<{ method: string; login: string; name: string; avatar: string } | null>(null);
 
@@ -47,10 +46,7 @@ export default function AdminPage() {
 
   const loadPages = useCallback(async () => {
     const res = await fetch('/api/admin/pages');
-    if (res.status === 401) return setAuthed(false);
-    const data = await res.json();
-    setAuthed(true);
-    setPages(data.pages ?? []);
+    setAuthed(res.status !== 401);
   }, []);
 
   useEffect(() => {
@@ -65,9 +61,7 @@ export default function AdminPage() {
       body: JSON.stringify({ pin }),
     });
     if (res.ok) {
-      setPin('');
-      setError('');
-      void loadPages();
+      window.location.assign('/docs');
     } else if (res.status === 503) {
       setError('Standalone login is not configured on this deployment yet.');
     } else {
@@ -137,7 +131,7 @@ export default function AdminPage() {
           <>
             {ghAvailable && (
               <a
-                href={`/api/auth/github/login?return=${encodeURIComponent('/admin')}`}
+                href={`/api/auth/github/login?return=${encodeURIComponent('/docs')}`}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '11px 18px', borderRadius: 10, background: '#1c1a16', color: '#fff', fontWeight: 600, fontSize: 15, textDecoration: 'none' }}
               >
                 <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden>
@@ -182,16 +176,15 @@ export default function AdminPage() {
           <button onClick={logout} style={{ ...field, padding: '6px 14px', fontSize: 13, background: 'transparent', cursor: 'pointer' }}>Sign out</button>
         </span>
       </div>
-      <p style={{ color: '#8a857a', marginBottom: 20 }}>Pick a page to edit, or open it on the site and hit “Edit page”.</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {pages.map((p) => (
-          <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', border: '1px solid #EAE4DA', borderRadius: 12, background: '#fff' }}>
-            <span style={{ flex: 1, fontFamily: 'ui-monospace, monospace', fontSize: 14 }}>/{p || '(index)'}</span>
-            <a href={`/docs/${p}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#8a857a' }}>View ↗</a>
-            <a href={`/admin/edit?slug=${encodeURIComponent(p)}`} style={{ fontSize: 13, fontWeight: 600, color: '#fff', background: ACCENT, padding: '7px 14px', borderRadius: 8, textDecoration: 'none' }}>Edit</a>
-          </div>
-        ))}
-      </div>
+      <p style={{ color: '#8a857a', marginBottom: 20 }}>
+        You’re signed in — open any page and hit “Edit page” to edit it in place.
+      </p>
+      <a
+        href="/docs"
+        style={{ ...field, display: 'inline-block', border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, textDecoration: 'none' }}
+      >
+        Open your docs →
+      </a>
     </main>
   );
 }
