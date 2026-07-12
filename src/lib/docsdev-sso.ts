@@ -54,6 +54,33 @@ const siteIdCache = new Map<string, { siteId: string | null; expires: number }>(
 const POSITIVE_TTL_MS = 5 * 60_000;
 const NEGATIVE_TTL_MS = 15_000;
 
+// docs.dev-first onboarding: when the site was created in the docs.dev
+// dashboard before this Worker existed, the user pasted a one-time setup
+// token into the Deploy button's DOCSDEV_SITE_TOKEN field. This Worker is
+// the only party that knows both the token and its real hostname, so it
+// redeems the token once — binding this host to the pending site. Single
+// attempt per isolate; after success the ordinary lookup takes over (and
+// the burned token is ignored forever).
+let claimAttempted = false;
+
+async function claimHostWithSetupToken(host: string): Promise<string | null> {
+  const token = process.env.DOCSDEV_SITE_TOKEN;
+  if (!token || claimAttempted) return null;
+  claimAttempted = true;
+  try {
+    const res = await fetch(new URL('/api/v1/sites/claim-host', ssoIssuer()), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ setup_token: token, host }),
+    });
+    if (!res.ok) return null; // burned/expired token — the lookup is the truth
+    return ((await res.json()) as { site_id?: string }).site_id ?? null;
+  } catch {
+    claimAttempted = false; // issuer unreachable — worth retrying later
+    return null;
+  }
+}
+
 /**
  * The site id this deployment should authenticate as: DOCSDEV_SITE_ID if
  * set, else the runtime hostname lookup. Null means SSO is not configured
@@ -77,6 +104,7 @@ export async function resolveSiteId(): Promise<string | null> {
   } catch {
     siteId = null; // issuer unreachable — treat as unconfigured, retry soon
   }
+  if (!siteId) siteId = await claimHostWithSetupToken(host);
   siteIdCache.set(host, {
     siteId,
     expires: Date.now() + (siteId ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS),

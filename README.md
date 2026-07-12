@@ -87,10 +87,17 @@ will:
 No post-deploy configuration: the build detects *your* new repository from
 its git remote (`scripts/gen-repo-info.mjs`), so the optional `/admin` web
 editor publishes to the right repo out of the box (it commits via the GitHub
-API using your `GITHUB_PAT` secret). To turn on team sign-in, open
-`/admin` on your deployed site and click **Connect this site to docs.dev** —
-ownership is verified through your Cloudflare account and takes effect
-within seconds, no redeploy.
+API using your `GITHUB_PAT` secret).
+
+Team sign-in, two ways:
+
+- **Starting at [app.docs.dev](https://app.docs.dev)** (smoothest): create a
+  site in the dashboard, paste its one-time setup token into the button's
+  `DOCSDEV_SITE_TOKEN` field, and the deployed site binds itself to your
+  team on first boot — nothing else to do.
+- **Already deployed?** Open `/admin` and click **Connect this site to
+  docs.dev** — ownership is verified through your Cloudflare account and
+  takes effect within seconds, no redeploy.
 
 ### Cloudflare Workers (manual)
 
