@@ -61,6 +61,12 @@ const NEGATIVE_TTL_MS = 15_000;
 // redeems the token once — binding this host to the pending site. Single
 // attempt per isolate; after success the ordinary lookup takes over (and
 // the burned token is ignored forever).
+//
+// This must only ever run from genuinely dynamic contexts (route handlers
+// like /api/admin/session) — resolveSiteId reads request headers, and a
+// statically prerendered page that touches a dynamic API at runtime is a
+// hard Next error ("Page changed from static to dynamic"), which took the
+// whole site down when this briefly lived in the root layout.
 let claimAttempted = false;
 
 async function claimHostWithSetupToken(host: string): Promise<string | null> {
