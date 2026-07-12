@@ -14,6 +14,7 @@
  */
 
 import { gitConfig } from './shared';
+import { resolveBranch } from './github-branch';
 
 export type ServerDraft = {
   slug: string;
@@ -48,13 +49,13 @@ class GitHubDraftStore implements DraftStore {
   private headers: Record<string, string>;
   private owner: string;
   private repo: string;
-  private baseBranch: string;
+  private pat: string;
   private branchReady = false;
 
   constructor(pat: string) {
     this.owner = process.env.GITHUB_OWNER ?? gitConfig.user;
     this.repo = process.env.GITHUB_REPO ?? gitConfig.repo;
-    this.baseBranch = process.env.GITHUB_BRANCH ?? gitConfig.branch;
+    this.pat = pat;
     this.headers = {
       Authorization: `Bearer ${pat}`,
       Accept: 'application/vnd.github+json',
@@ -75,7 +76,8 @@ class GitHubDraftStore implements DraftStore {
       this.branchReady = true;
       return;
     }
-    const base = await fetch(this.api(`/git/ref/heads/${this.baseBranch}`), { headers: this.headers });
+    const baseBranch = await resolveBranch(this.pat);
+    const base = await fetch(this.api(`/git/ref/heads/${baseBranch}`), { headers: this.headers });
     if (!base.ok) throw new Error(`Cannot read base branch (${base.status})`);
     const sha = ((await base.json()) as { object: { sha: string } }).object.sha;
     const created = await fetch(this.api('/git/refs'), {
