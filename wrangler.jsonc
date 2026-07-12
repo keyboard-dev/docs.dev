@@ -49,16 +49,16 @@
   //                                user authorization, install on the repo)
   //   TAVILY_API_KEY or BRAVE_API_KEY — optional web search grounding for
   //                                "Generate with AI" (skipped when unset)
-  // Non-secret defaults can live here:
-  "vars": {
-    "GITHUB_OWNER": "keyboard-dev",
-    "GITHUB_REPO": "docs.dev",
-    "GITHUB_BRANCH": "main",
-    // Team sign-in via docs.dev. Register your site in the docs.dev dashboard
-    // (redirect URI: https://<your-host>/api/admin/sso/callback), then paste
-    // the Site ID here. When set, docs.dev sign-in is the ONLY method — PIN
-    // and GitHub App OAuth are disabled. Leave empty for standalone auth.
-    "DOCSDEV_SITE_ID": "",
-    "DOCSDEV_ISSUER": "https://app.docs.dev"
-  }
+  //
+  // Zero-config by default — no "vars" block, so the Deploy to Cloudflare
+  // button prompts for nothing:
+  //   - The publish target repo/branch is detected from this checkout's git
+  //     remote at build time (scripts/gen-repo-info.mjs). Override with
+  //     GITHUB_OWNER / GITHUB_REPO / GITHUB_BRANCH env vars if needed.
+  //   - Team sign-in resolves at runtime: connect the site at
+  //     https://app.docs.dev/connect?host=<your-host> (the /admin page links
+  //     there) and it takes effect within seconds. Pin DOCSDEV_SITE_ID to
+  //     skip the lookup, or DOCSDEV_ISSUER to use a different docs.dev
+  //     service origin. With team sign-in active it is the ONLY method — PIN
+  //     and GitHub App OAuth are disabled.
 }

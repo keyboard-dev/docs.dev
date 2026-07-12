@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import {
   randomToken,
+  resolveSiteId,
   s256,
-  ssoEnabled,
   ssoIssuer,
-  ssoSiteId,
   SSO_STATE_COOKIE,
   SSO_VERIFIER_COOKIE,
 } from '@/lib/docsdev-sso';
@@ -12,7 +11,8 @@ import {
 // Kicks off the docs.dev sign-in: stash state + PKCE verifier in short-lived
 // cookies, then redirect to the central /authorize endpoint.
 export async function GET(request: Request) {
-  if (!ssoEnabled()) {
+  const siteId = await resolveSiteId();
+  if (!siteId) {
     return NextResponse.json({ ok: false, error: 'docs.dev sign-in is not configured.' }, { status: 404 });
   }
 
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   const callback = new URL('/api/admin/sso/callback', request.url).toString();
 
   const authorize = new URL('/authorize', ssoIssuer());
-  authorize.searchParams.set('site_id', ssoSiteId()!);
+  authorize.searchParams.set('site_id', siteId);
   authorize.searchParams.set('redirect_uri', callback);
   authorize.searchParams.set('state', state);
   authorize.searchParams.set('code_challenge', await s256(verifier));

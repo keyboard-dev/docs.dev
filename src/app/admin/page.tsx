@@ -15,6 +15,7 @@ export default function AdminPage() {
   const [sso, setSso] = useState(false);
   const [pinConfigured, setPinConfigured] = useState(true); // assume true until checked, to avoid a flash
   const [ghAvailable, setGhAvailable] = useState(false);
+  const [connectUrl, setConnectUrl] = useState<string | null>(null);
   const [pin, setPin] = useState('');
   const [pages, setPages] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -29,6 +30,7 @@ export default function AdminPage() {
         setSso(!!d.sso);
         setGhAvailable(!!d.githubOAuth);
         setPinConfigured(d.pinConfigured !== false);
+        setConnectUrl(typeof d.connect === 'string' ? d.connect : null);
         setUser(d.user ?? null);
       })
       .catch(() => {});
@@ -97,12 +99,33 @@ export default function AdminPage() {
       <main style={shell}>
         <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>docs.dev admin</h1>
         {nothingConfigured ? (
-          <p style={{ background: '#fdf0e6', border: '1px solid #f0c9a0', color: '#8a4a12', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 20 }}>
-            ⚠️ No login is configured for this deployment yet. Set <code>DOCSDEV_SITE_ID</code> to
-            sign in with your docs.dev team, configure GitHub sign-in
-            (<code>GITHUB_APP_CLIENT_ID</code>/<code>SECRET</code>), or set the{' '}
-            <code>ADMIN_PIN</code> and <code>ADMIN_SECRET</code> secrets for a PIN.
-          </p>
+          connectUrl ? (
+            <>
+              <p style={{ color: '#8a857a', marginBottom: 20 }}>
+                Almost there — this site isn&apos;t connected to a docs.dev team yet. Connect it
+                to unlock editing: you&apos;ll sign in with GitHub and verify with Cloudflare that
+                this site is yours. Takes about a minute.
+              </p>
+              <a
+                href={connectUrl}
+                style={{ ...field, display: 'inline-block', border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, textDecoration: 'none', marginBottom: 20 }}
+              >
+                Connect this site to docs.dev →
+              </a>
+              <p style={{ color: '#b6b1a6', fontSize: 12, marginBottom: 20 }}>
+                Prefer standalone auth? Set <code>ADMIN_PIN</code> + <code>ADMIN_SECRET</code>,
+                or GitHub sign-in (<code>GITHUB_APP_CLIENT_ID</code>/<code>SECRET</code>) — see
+                the README.
+              </p>
+            </>
+          ) : (
+            <p style={{ background: '#fdf0e6', border: '1px solid #f0c9a0', color: '#8a4a12', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 20 }}>
+              ⚠️ No login is configured for this deployment yet. Set <code>DOCSDEV_SITE_ID</code> to
+              sign in with your docs.dev team, configure GitHub sign-in
+              (<code>GITHUB_APP_CLIENT_ID</code>/<code>SECRET</code>), or set the{' '}
+              <code>ADMIN_PIN</code> and <code>ADMIN_SECRET</code> secrets for a PIN.
+            </p>
+          )
         ) : (
           <p style={{ color: '#8a857a', marginBottom: 24 }}>Sign in to edit content.</p>
         )}

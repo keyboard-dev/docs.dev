@@ -84,9 +84,13 @@ will:
    you attach later), and
 3. redeploy automatically on every push to your new repo's default branch.
 
-After deploying, update `GITHUB_OWNER` / `GITHUB_REPO` in `wrangler.jsonc` to
-point at *your* new repository if you want the optional `/admin` web editor to
-publish (it commits via the GitHub API using your `GITHUB_PAT` secret).
+No post-deploy configuration: the build detects *your* new repository from
+its git remote (`scripts/gen-repo-info.mjs`), so the optional `/admin` web
+editor publishes to the right repo out of the box (it commits via the GitHub
+API using your `GITHUB_PAT` secret). To turn on team sign-in, open
+`/admin` on your deployed site and click **Connect this site to docs.dev** —
+ownership is verified through your Cloudflare account and takes effect
+within seconds, no redeploy.
 
 ### Cloudflare Workers (manual)
 
@@ -113,12 +117,13 @@ wrangler secret put ADMIN_SECRET    # required alongside ADMIN_PIN — any long 
 > `/admin` login. There is no built-in default — this repo is public, so a
 > hardcoded fallback would be a published constant, not a secret. Without
 > both set, `/admin` reports no login is configured until you set them, or
-> switch to team sign-in by setting `DOCSDEV_SITE_ID` (from your docs.dev
-> dashboard) in `wrangler.jsonc` — see `src/lib/docsdev-sso.ts`.
+> switch to team sign-in by connecting the site to docs.dev (the `/admin`
+> page links the connect flow; `DOCSDEV_SITE_ID` env var also works) — see
+> `src/lib/docsdev-sso.ts`.
 
-`GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_BRANCH` are non-secret `vars` in
-`wrangler.jsonc`. The public docs need no env vars; the variables only power
-the `/admin` editor's publish flow.
+The publish target is detected from the checkout's git remote at build time;
+`GITHUB_OWNER` / `GITHUB_REPO` / `GITHUB_BRANCH` env vars override it if
+needed. The public docs need no env vars at all.
 
 > **Note:** Fumadocs' `proxy.ts` (Next 16 middleware for `.md` content
 > negotiation) is parked as `_proxy.ts.disabled` because OpenNext doesn't yet

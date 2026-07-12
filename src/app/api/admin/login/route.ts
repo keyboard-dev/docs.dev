@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { checkPin, pinAuthConfigured, sealSession, SESSION_COOKIE, SESSION_MAX_AGE_S } from '@/lib/admin';
-import { ssoEnabled } from '@/lib/docsdev-sso';
+import { ssoActive } from '@/lib/docsdev-sso';
 
 export async function POST(request: Request) {
   // With docs.dev sign-in configured, the PIN path is disabled — a leftover
   // PIN must not bypass team membership checks.
-  if (ssoEnabled()) {
+  if (await ssoActive()) {
     return NextResponse.json(
       { ok: false, error: 'This site uses docs.dev sign-in. Go to /api/admin/sso/start.' },
       { status: 403 },

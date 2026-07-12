@@ -1,9 +1,8 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import {
-  ssoEnabled,
+  resolveSiteId,
   ssoIssuer,
-  ssoSiteId,
   verifySsoToken,
   SSO_JWT_COOKIE,
   SSO_STATE_COOKIE,
@@ -14,7 +13,8 @@ import {
 // for a session JWT, verify it against the docs.dev JWKS, and store it as the
 // admin session cookie.
 export async function GET(request: Request) {
-  if (!ssoEnabled()) {
+  const siteId = await resolveSiteId();
+  if (!siteId) {
     return NextResponse.json({ ok: false, error: 'docs.dev sign-in is not configured.' }, { status: 404 });
   }
 
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       code,
       code_verifier: verifier,
       redirect_uri: new URL('/api/admin/sso/callback', request.url).toString(),
-      client_id: ssoSiteId(),
+      client_id: siteId,
     }),
   });
   if (!tokenRes.ok) {

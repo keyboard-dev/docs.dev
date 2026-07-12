@@ -127,17 +127,12 @@ Content-Type: application/json
 {"name": "<user's site name>", "redirect_uri": "https://$HOST/api/admin/sso/callback"}
 ```
 
-The response contains the site `id` (`site_…`). Redeploy with it — no file
-edits or rebuild needed:
-
-```bash
-npx wrangler@latest deploy --temporary \
-  --var DOCSDEV_SITE_ID:site_… \
-  --var DOCSDEV_ISSUER:$ISSUER
-```
-
-This also resets the 60-minute claim window. From this moment the site's
-`/admin` editor signs in through the user's docs.dev team.
+Registration takes effect on its own: the deployed site resolves its Site ID
+at runtime via `GET $ISSUER/api/v1/sites/lookup?host=$HOST` (cached ~15s
+while unregistered), so within seconds the `/admin` editor signs in through
+the user's docs.dev team — no redeploy, no env vars. (If you deployed with a
+non-default `$ISSUER`, pass `--var DOCSDEV_ISSUER:$ISSUER` at deploy time in
+step 2.)
 
 ### 4. Hand over
 
@@ -157,7 +152,8 @@ they own. Sensible next steps to offer:
 
 - Move the code into their GitHub and connect Workers Builds for
   push-to-deploy (the Deploy to Cloudflare button in the README does this for
-  fresh setups), then set `GITHUB_OWNER` / `GITHUB_REPO` in `wrangler.jsonc`.
+  fresh setups). The publish target self-detects from the new repo's git
+  remote on the next build — nothing to edit.
 - Restore the `"ai"` binding in `wrangler.jsonc` if it was removed in step 2.
 - Set editor secrets (`GITHUB_PAT`, or the GitHub App credentials) per the
   README if they want the publish-to-repo flow.

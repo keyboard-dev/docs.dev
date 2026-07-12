@@ -3,10 +3,15 @@ export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';
 export const docsContentRoute = '/llms.mdx/docs';
 
-// Default GitHub target for the admin editor's "Publish" action. The branch is
-// overridable in the admin UI (and persisted per-browser in IndexedDB).
+import repoInfo from './repo-info.generated.json';
+
+// Default GitHub target for the admin editor's "Publish" action — detected
+// from this checkout's git remote at build time (scripts/gen-repo-info.mjs),
+// so Deploy-to-Cloudflare copies publish to their own repo automatically.
+// GITHUB_OWNER / GITHUB_REPO / GITHUB_BRANCH env vars override where read;
+// the branch is also overridable in the admin UI (persisted per-browser).
 export const gitConfig = {
-  user: 'keyboard-dev',
-  repo: 'docs.dev',
-  branch: 'main',
+  user: repoInfo.owner,
+  repo: repoInfo.repo,
+  branch: repoInfo.branch,
 };
