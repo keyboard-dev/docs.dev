@@ -1,34 +1,90 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  // Top-level configuration
-  "name": "my-worker",
-  "main": "src/index.js",
-  // Set this to today's date
-  "compatibility_date": "2026-07-11",
-  "workers_dev": false,
-  "route": {
-    "pattern": "example.org/*",
-    "zone_name": "example.org",
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "docsdotdev",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  // The site must be reachable the moment it deploys: keep the production
+  // <worker>.<subdomain>.workers.dev URL and per-version preview URLs
+  // enabled regardless of the account's dashboard defaults.
+  "workers_dev": true,
+  "preview_urls": true,
+  // nodejs_compat provides node:crypto / Buffer, which the admin auth uses.
+  "compatibility_flags": ["nodejs_compat"],
+  // Without this, esbuild's keepNames injects __name(...) helpers into
+  // functions Next.js serializes into inline <script> tags, throwing
+  // "__name is not defined" in the browser on every page.
+  "keep_names": false,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
   },
-  "kv_namespaces": [
-    {
-      "binding": "<MY_NAMESPACE>",
-      "id": "<KV_ID>",
-    },
-  ],
-  "env": {
-    "staging": {
-      "name": "my-worker-staging",
-      "route": {
-        "pattern": "staging.example.org/*",
-        "zone_name": "example.org",
-      },
-      "kv_namespaces": [
-        {
-          "binding": "<MY_NAMESPACE>",
-          "id": "<STAGING_KV_ID>",
-        },
-      ],
-    },
+  // Workers AI powers the editor's "Generate with AI" (docs writing) and
+  // image generation. Models overridable via AI_TEXT_MODEL / AI_IMAGE_MODEL.
+  "ai": {
+    "binding": "AI"
   },
+  // Metadata (id/tag/timestamp) of the currently running Worker version —
+  // surfaced via /api/version and the editor's post-publish deploy status.
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+  // OPTIONAL — Ask AI insights (what readers ask, what the docs couldn't
+  // answer; shown to admins under "Questions…" in the sidebar). Create the
+  // database once, paste its id, and uncomment:
+  //   npx wrangler d1 create docsdev-insights
+  // Logging is anonymous (question text, page, timestamp — no IPs or
+  // identifiers) and rows are pruned after 90 days. Without this binding,
+  // nothing is logged and the panel reports the feature as off.
+  // "d1_databases": [
+  //   {
+  //     "binding": "INSIGHTS",
+  //     "database_name": "docsdev-insights",
+  //     "database_id": "<paste the id from `wrangler d1 create`>"
+  //   }
+  // ],
+  // Set secrets with `wrangler secret put <NAME>`:
+  //   GITHUB_PAT                — server fallback credential (PIN/docs.dev
+  //                               sessions, shared drafts branch)
+  //   ADMIN_PIN, ADMIN_SECRET   — PIN sign-in + session sealing key (no
+  //                               defaults; standalone login fails closed
+  //                               without them)
+  //   GITHUB_APP_CLIENT_ID      — GitHub App OAuth ("Sign in with GitHub":
+  //   GITHUB_APP_CLIENT_SECRET     register a GitHub App with callback URL
+  //                                <site>/api/auth/github/callback, enable
+  //                                user authorization, install on the repo)
+  //   TAVILY_API_KEY or BRAVE_API_KEY — optional web search grounding for
+  //                                "Generate with AI" (skipped when unset)
+  // The ONE field the Deploy to Cloudflare button asks about. Creating a
+  // site at app.docs.dev first hands you a site token (dst_…) — paste it in
+  // during the button flow and the deployed site binds itself to your team
+  // automatically. Leave blank if you didn't start there (connect later
+  // from /admin instead).
+  //
+  // Declared as a SECRET, not a var: after the first claim the token
+  // becomes this Worker's durable credential (it's what lets the Worker
+  // request approval for custom domains you add later, with no re-pasting),
+  // so it must not be readable by every dashboard member or workers-read
+  // API token — and unlike a config var, a secret survives every future
+  // push-to-deploy. Secrets are write-only after creation; the code reads
+  // process.env.DOCSDEV_SITE_TOKEN either way, and .dev.vars works locally.
+  // Set or rotate it any time with: npx wrangler secret put DOCSDEV_SITE_TOKEN
+  //
+  // wrangler refuses to deploy while a required secret is unset, which
+  // would strand users who skipped the token (they connect from /admin
+  // instead) — scripts/cf-deploy.mjs closes that gap by seeding the
+  // placeholder "unset" (ignored by the app) when no value exists yet.
+  "secrets": {
+    "required": ["DOCSDEV_SITE_TOKEN"]
+  },
+  //
+  // Otherwise zero-config — the button prompts for nothing else:
+  //   - The publish target repo/branch is detected from this checkout's git
+  //     remote at build time (scripts/gen-repo-info.mjs). Override with
+  //     GITHUB_OWNER / GITHUB_REPO / GITHUB_BRANCH env vars if needed.
+  //   - Team sign-in resolves at runtime: connect the site at
+  //     https://app.docs.dev/connect?host=<your-host> (the /admin page links
+  //     there) and it takes effect within seconds. Pin DOCSDEV_SITE_ID to
+  //     skip the lookup, or DOCSDEV_ISSUER to use a different docs.dev
+  //     service origin. With team sign-in active it is the ONLY method — PIN
+  //     and GitHub App OAuth are disabled.
 }
