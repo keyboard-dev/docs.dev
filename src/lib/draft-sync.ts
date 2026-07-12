@@ -1,6 +1,8 @@
 /**
  * Client side of the shared draft store: push/pull helpers plus the editor's
- * self-reported display name (shown to teammates on drafts they didn't write).
+ * display name (shown to teammates on drafts they didn't write). The name
+ * comes from the signed-in session — every editor is authenticated, so
+ * nobody is ever prompted to type one.
  */
 
 export type RemoteDraft = { slug: string; content: string; updatedAt: number; author: string };
@@ -16,22 +18,26 @@ export function primeEditorName(name: string | null | undefined): void {
   if (name) sessionName = name;
 }
 
-export function editorName(interactive = false): string {
+let selfPrimeStarted = false;
+
+export function editorName(): string {
   if (sessionName) return sessionName;
   try {
     const saved = localStorage.getItem(NAME_KEY);
     if (saved) return saved;
-    if (interactive) {
-      const name = window.prompt('Your name (shown to teammates on your drafts):')?.trim();
-      if (name) {
-        localStorage.setItem(NAME_KEY, name.slice(0, 60));
-        return name.slice(0, 60);
-      }
-    }
   } catch {
     // storage unavailable — fall through
   }
-  return 'Anonymous';
+  // Session fetch hasn't primed us yet (first edit races it) — prime for the
+  // next save rather than interrupting this one with a prompt.
+  if (!selfPrimeStarted && typeof window !== 'undefined') {
+    selfPrimeStarted = true;
+    fetch('/api/admin/session')
+      .then((r) => r.json())
+      .then((d) => primeEditorName(d?.user?.name || d?.user?.login))
+      .catch(() => {});
+  }
+  return 'Editor';
 }
 
 export async function fetchServerDraft(slug: string): Promise<RemoteDraft | null> {

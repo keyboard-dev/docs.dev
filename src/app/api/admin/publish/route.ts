@@ -4,6 +4,7 @@ import { repoCredential } from '@/lib/github-auth';
 import { commitFile, ghHeaders, type GhHeaders } from '@/lib/github-commit';
 import { checkDocSource } from '@/lib/mdx-check';
 import { gitConfig } from '@/lib/shared';
+import { resolveBranch } from '@/lib/github-branch';
 
 /**
  * Commit a doc (and any uploaded assets) to GitHub using the server-held token.
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
 
   const owner = process.env.GITHUB_OWNER ?? gitConfig.user;
   const repo = process.env.GITHUB_REPO ?? gitConfig.repo;
-  const branch = process.env.GITHUB_BRANCH ?? gitConfig.branch;
+  const branch = await resolveBranch(cred.token);
   const headers: GhHeaders = ghHeaders(cred.token);
 
   try {

@@ -59,7 +59,8 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover
           markdownUrl={markdownUrl}
-          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${page.path}`}
+          // blob/HEAD resolves to the repo's default branch — the build-time branch guess can be stale
+          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/HEAD/content/docs/${page.path}`}
         />
       </div>
       <DocsBody data-api-page={apiProps ? '' : undefined}>

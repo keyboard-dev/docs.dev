@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { readSession, sealSession, SESSION_COOKIE, SESSION_MAX_AGE_S } from '@/lib/admin';
 import { repoCredential } from '@/lib/github-auth';
 import { gitConfig } from '@/lib/shared';
+import { resolveBranch } from '@/lib/github-branch';
 
 /**
  * Publish the site theme picked in the admin sidebar.
@@ -48,7 +49,7 @@ export async function PUT(request: Request) {
 
   const owner = process.env.GITHUB_OWNER ?? gitConfig.user;
   const repo = process.env.GITHUB_REPO ?? gitConfig.repo;
-  const branch = process.env.GITHUB_BRANCH ?? gitConfig.branch;
+  const branch = await resolveBranch(cred.token);
   const headers = {
     Authorization: `Bearer ${cred.token}`,
     Accept: 'application/vnd.github+json',

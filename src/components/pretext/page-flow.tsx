@@ -249,7 +249,7 @@ export function PageFlow({
       {ready && figure && (
         <div style={{ position: 'absolute', top: figure.top, [figure.side]: 0, width: figure.width, height: figure.height }}>
           {figure.orb ? (
-            <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'radial-gradient(circle at 35% 30%, #ffb27a 0%, #e8753b 35%, #7a2d12 100%)', boxShadow: '0 0 60px 12px rgba(232,117,59,0.4), inset -16px -20px 50px rgba(0,0,0,0.45)' }} />
+            <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: 'radial-gradient(circle at 35% 30%, #a5b4fc 0%, #6366f1 40%, #1e1b4b 100%)', boxShadow: '0 0 60px 12px rgba(99,102,241,0.4), inset -16px -20px 50px rgba(0,0,0,0.45)' }} />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={figure.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }} />

@@ -81,8 +81,8 @@ export default function AdminPage() {
     setUser(null);
   }
 
-  const shell: React.CSSProperties = { maxWidth: 720, margin: '0 auto', padding: '56px 24px', fontFamily: 'ui-sans-serif, system-ui, sans-serif', color: '#1c1a16' };
-  const field: React.CSSProperties = { padding: '10px 14px', borderRadius: 10, border: '1px solid #ccc', fontSize: 16 };
+  const shell: React.CSSProperties = { maxWidth: 720, margin: '0 auto', padding: '56px 24px', fontFamily: 'ui-sans-serif, system-ui, sans-serif', color: 'var(--color-fd-foreground, #1c1a16)' };
+  const field: React.CSSProperties = { padding: '10px 14px', borderRadius: 10, border: '1px solid var(--color-fd-border, #ccc)', background: 'transparent', color: 'inherit', fontSize: 16 };
   const divider = (label: string) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '22px 0', color: '#b6b1a6', fontSize: 12 }}>
       <span style={{ flex: 1, height: 1, background: '#EAE4DA' }} />

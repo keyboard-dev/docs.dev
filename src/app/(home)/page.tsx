@@ -4,7 +4,7 @@ import { Flow, type Obstacle } from '@/components/pretext/flow';
 import { AgentPrompt } from './agent-prompt';
 
 export const metadata: Metadata = {
-  title: 'docs.dev — AI drafts your docs. Your team makes them true.',
+  title: { absolute: 'docs.dev — AI drafts your docs. Your team makes them true.' },
   description:
     'Point your coding agent at your repo and your docs; it opens a docs branch, your team reviews on the rendered page, publishing is a commit. Runs on your Cloudflare — no platform fee, no metered AI.',
 };
@@ -399,6 +399,14 @@ export default function HomePage() {
           </a>
         </div>
       </section>
+
+      <footer className="mt-20 text-center text-[13px] text-fd-muted-foreground">
+        Built with ♥ by the{' '}
+        <a href="https://keyboard.dev" className="underline hover:text-fd-foreground">
+          keyboard.dev
+        </a>{' '}
+        team
+      </footer>
     </main>
   );
 }

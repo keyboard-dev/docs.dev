@@ -14,6 +14,7 @@
  */
 
 import { gitConfig } from './shared';
+import { resolveBranch } from './github-branch';
 
 export type BranchInfo = { name: string };
 export type BranchPage = { slug: string; path: string; status: 'added' | 'modified' };
@@ -28,7 +29,6 @@ function repoTarget() {
   return {
     owner: process.env.GITHUB_OWNER ?? gitConfig.user,
     repo: process.env.GITHUB_REPO ?? gitConfig.repo,
-    base: process.env.GITHUB_BRANCH ?? gitConfig.branch,
   };
 }
 
@@ -57,7 +57,7 @@ editor for review.
  *  branch and the drafts store itself. */
 export async function listReviewableBranches(token: string): Promise<BranchInfo[]> {
   if (branchContentMocked()) return [{ name: MOCK_BRANCH }];
-  const { base } = repoTarget();
+  const base = await resolveBranch(token);
   const res = await fetch(api('/branches?per_page=100'), { headers: { ...GH_HEADERS, Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`Cannot list branches (${res.status})`);
   const branches = (await res.json()) as Array<{ name: string }>;
@@ -70,7 +70,7 @@ export async function changedDocPages(token: string, branch: string): Promise<Br
   if (branchContentMocked()) {
     return branch === MOCK_BRANCH ? [{ slug: 'webhooks', path: 'content/docs/webhooks.mdx', status: 'added' }] : [];
   }
-  const { base } = repoTarget();
+  const base = await resolveBranch(token);
   const res = await fetch(
     api(`/compare/${encodeURIComponent(base)}...${encodeURIComponent(branch)}`),
     { headers: { ...GH_HEADERS, Authorization: `Bearer ${token}` } },

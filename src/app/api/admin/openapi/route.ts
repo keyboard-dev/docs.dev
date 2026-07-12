@@ -3,6 +3,7 @@ import { readSession } from '@/lib/admin';
 import { repoCredential } from '@/lib/github-auth';
 import { commitFile, deleteFile, ghHeaders } from '@/lib/github-commit';
 import { gitConfig } from '@/lib/shared';
+import { resolveBranch } from '@/lib/github-branch';
 
 /**
  * Manage the OpenAPI specs behind the generated API reference.
@@ -32,7 +33,6 @@ function repoTarget() {
   return {
     owner: process.env.GITHUB_OWNER ?? gitConfig.user,
     repo: process.env.GITHUB_REPO ?? gitConfig.repo,
-    branch: process.env.GITHUB_BRANCH ?? gitConfig.branch,
   };
 }
 
@@ -68,7 +68,8 @@ export async function GET() {
   if (!cred) {
     return NextResponse.json({ ok: false, error: 'No GitHub credential — set GITHUB_PAT or sign in with GitHub.' }, { status: 503 });
   }
-  const { owner, repo, branch } = repoTarget();
+  const { owner, repo } = repoTarget();
+  const branch = await resolveBranch(cred.token);
   const res = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/contents/openapi?ref=${encodeURIComponent(branch)}`,
     { headers: ghHeaders(cred.token) },
@@ -105,7 +106,8 @@ export async function PUT(request: Request) {
   if (!cred) {
     return NextResponse.json({ ok: false, error: 'No GitHub credential — set GITHUB_PAT or sign in with GitHub.' }, { status: 503 });
   }
-  const { owner, repo, branch } = repoTarget();
+  const { owner, repo } = repoTarget();
+  const branch = await resolveBranch(cred.token);
   const r = await commitFile(
     owner,
     repo,
@@ -133,7 +135,8 @@ export async function DELETE(request: Request) {
   if (!cred) {
     return NextResponse.json({ ok: false, error: 'No GitHub credential — set GITHUB_PAT or sign in with GitHub.' }, { status: 503 });
   }
-  const { owner, repo, branch } = repoTarget();
+  const { owner, repo } = repoTarget();
+  const branch = await resolveBranch(cred.token);
   const r = await deleteFile(
     owner,
     repo,

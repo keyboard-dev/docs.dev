@@ -1,5 +1,12 @@
+import type { Metadata } from 'next';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import './global.css';
+
+// Every page carries the brand in the tab; pages with their own metadata
+// slot into the template ("Getting started · docs.dev").
+export const metadata: Metadata = {
+  title: { default: 'docs.dev', template: '%s · docs.dev' },
+};
 
 /**
  * Brand type is self-hosted from public/fonts (declared in global.css):

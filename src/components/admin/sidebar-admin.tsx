@@ -138,7 +138,7 @@ export function SidebarAdmin() {
       .then((d) => {
         if (cancelled) return;
         setAdmin(!!d.admin);
-        if (d.user?.method === 'github') primeEditorName(d.user.name || d.user.login);
+        if (d.user) primeEditorName(d.user.name || d.user.login);
       })
       .catch(() => {});
     return () => {
@@ -366,7 +366,7 @@ export function SidebarAdmin() {
           return;
         }
       }
-      const pushed = await pushServerDraft(slug, data.content, existing?.updatedAt ?? 0, editorName(true));
+      const pushed = await pushServerDraft(slug, data.content, existing?.updatedAt ?? 0, editorName());
       if (!pushed.ok && 'conflict' in pushed) {
         // Raced with a save between the check and the push.
         setBranchNote(`${pushed.conflict.author} just saved a newer draft of this page — try again.`);
@@ -387,7 +387,7 @@ export function SidebarAdmin() {
     if (!slug) return;
     const content = `---\ntitle: ${t}\ndescription: \n---\n\nStart writing…\n`;
     await putDraft(slug, content);
-    await pushServerDraft(slug, content, 0, editorName(true));
+    await pushServerDraft(slug, content, 0, editorName());
     setTitle('');
     setOpen(false);
     void refresh();
