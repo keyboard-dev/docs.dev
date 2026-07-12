@@ -100,7 +100,7 @@ export function usePageDraft(slug: string) {
   const pushNow = useCallback(async () => {
     const content = draftRef.current;
     if (content === '' || conflict) return;
-    const result = await pushServerDraft(slug, content, serverBase.current, editorName(true));
+    const result = await pushServerDraft(slug, content, serverBase.current, editorName());
     if (result.ok) {
       serverBase.current = result.updatedAt;
       setStatus('Draft · synced with team');
@@ -148,7 +148,7 @@ export function usePageDraft(slug: string) {
     if (!conflict) return;
     serverBase.current = conflict.updatedAt;
     setConflict(null);
-    await pushServerDraft(slug, draftRef.current, conflict.updatedAt, editorName(true)).then((r) => {
+    await pushServerDraft(slug, draftRef.current, conflict.updatedAt, editorName()).then((r) => {
       if (r.ok) {
         serverBase.current = r.updatedAt;
         setStatus('Draft · synced with team');

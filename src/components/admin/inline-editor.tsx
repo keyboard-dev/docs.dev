@@ -316,7 +316,7 @@ export function InlineEditor() {
       .then((d) => {
         if (cancelled) return;
         setAdmin(!!d.admin);
-        if (d.user?.method === 'github') primeEditorName(d.user.name || d.user.login);
+        if (d.user) primeEditorName(d.user.name || d.user.login);
       })
       .catch(() => {});
     return () => {
