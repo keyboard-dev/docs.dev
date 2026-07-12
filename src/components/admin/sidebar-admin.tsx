@@ -69,7 +69,12 @@ export function SidebarAdmin() {
   const [themeNote, setThemeNote] = useState('');
   const [publishingTheme, setPublishingTheme] = useState(false);
   const [branchesOpen, setBranchesOpen] = useState(false);
-  const [branches, setBranches] = useState<string[] | null>(null);
+  const [branches, setBranches] = useState<Array<{ name: string; merged: boolean; docChanges: number }> | null>(null);
+  // Default view: branches worth reviewing — unmerged AND touching docs
+  // content. Either filter can be lifted, and the list is searchable.
+  const [branchContentOnly, setBranchContentOnly] = useState(true);
+  const [branchUnmergedOnly, setBranchUnmergedOnly] = useState(true);
+  const [branchQuery, setBranchQuery] = useState('');
   const [branch, setBranch] = useState<string | null>(null);
   const [branchPages, setBranchPages] = useState<BranchPageRow[] | null>(null);
   const [branchNote, setBranchNote] = useState('');
@@ -318,14 +323,20 @@ export function SidebarAdmin() {
     setBranchPages(null);
     setBranchesOpen((o) => !o);
     setBranches(null);
+    setBranchQuery('');
     const res = await fetch('/api/admin/branches');
-    const data = (await res.json().catch(() => ({}))) as { branches?: Array<{ name: string }>; error?: string };
+    const data = (await res.json().catch(() => ({}))) as {
+      branches?: Array<{ name: string; merged?: boolean; docChanges?: number }>;
+      error?: string;
+    };
     if (!res.ok) {
       setBranchNote(data.error ?? 'Could not list branches.');
       setBranches([]);
       return;
     }
-    setBranches((data.branches ?? []).map((b) => b.name));
+    setBranches(
+      (data.branches ?? []).map((b) => ({ name: b.name, merged: !!b.merged, docChanges: b.docChanges ?? 0 })),
+    );
   }, []);
 
   const pickBranch = useCallback(async (name: string) => {
@@ -808,9 +819,51 @@ export function SidebarAdmin() {
             </button>
           </div>
 
+          {!branch && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 8px 2px' }}>
+              <input
+                value={branchQuery}
+                onChange={(e) => setBranchQuery(e.target.value)}
+                placeholder="Search branches…"
+                style={{
+                  padding: '6px 8px', borderRadius: 8, border: '1px solid var(--color-fd-border)',
+                  background: 'transparent', color: 'inherit', fontSize: 12.5,
+                }}
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                {(
+                  [
+                    ['Content changes', branchContentOnly, setBranchContentOnly],
+                    ['Unmerged', branchUnmergedOnly, setBranchUnmergedOnly],
+                  ] as const
+                ).map(([label, on, set]) => (
+                  <button
+                    key={label}
+                    onClick={() => set(!on)}
+                    title={on ? 'Filter is on — click to show everything' : 'Filter is off — click to re-apply'}
+                    style={{
+                      padding: '3px 9px', borderRadius: 999, fontSize: 11.5, cursor: 'pointer',
+                      border: `1px solid ${on ? 'var(--docsdev-accent, #6366f1)' : 'var(--color-fd-border)'}`,
+                      background: on ? 'color-mix(in srgb, var(--docsdev-accent, #6366f1) 14%, transparent)' : 'transparent',
+                      color: on ? 'var(--color-fd-foreground)' : 'var(--color-fd-muted-foreground)',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div style={{ overflowY: 'auto', padding: 6 }}>
             {!branch &&
-              (branches ?? []).map((name) => (
+              (branches ?? [])
+                .filter(
+                  (b) =>
+                    (!branchContentOnly || b.docChanges > 0) &&
+                    (!branchUnmergedOnly || !b.merged) &&
+                    b.name.toLowerCase().includes(branchQuery.trim().toLowerCase()),
+                )
+                .map(({ name, merged, docChanges }) => (
                 <button
                   key={name}
                   onClick={() => void pickBranch(name)}
@@ -823,9 +876,30 @@ export function SidebarAdmin() {
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
                   <GitBranch size={12} style={{ color: 'var(--color-fd-muted-foreground)', flexShrink: 0 }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                  {docChanges > 0 && (
+                    <span style={{ fontSize: 11, color: 'var(--color-fd-muted-foreground)', flexShrink: 0 }}>
+                      {docChanges} page{docChanges === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {merged && (
+                    <span style={{ fontSize: 10.5, color: 'var(--color-fd-muted-foreground)', border: '1px solid var(--color-fd-border)', borderRadius: 999, padding: '1px 6px', flexShrink: 0 }}>
+                      merged
+                    </span>
+                  )}
                 </button>
               ))}
+            {!branch && branches !== null && branches.length > 0 &&
+              !branches.some(
+                (b) =>
+                  (!branchContentOnly || b.docChanges > 0) &&
+                  (!branchUnmergedOnly || !b.merged) &&
+                  b.name.toLowerCase().includes(branchQuery.trim().toLowerCase()),
+              ) && (
+              <div style={{ padding: 10, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)' }}>
+                No branches match — lift a filter above to see the rest.
+              </div>
+            )}
             {!branch && branches === null && (
               <div style={{ padding: 10, fontSize: 12.5, color: 'var(--color-fd-muted-foreground)' }}>Loading branches…</div>
             )}
