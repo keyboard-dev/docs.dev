@@ -3,6 +3,11 @@
   "name": "docsdotdev",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-25",
+  // The site must be reachable the moment it deploys: keep the production
+  // <worker>.<subdomain>.workers.dev URL and per-version preview URLs
+  // enabled regardless of the account's dashboard defaults.
+  "workers_dev": true,
+  "preview_urls": true,
   // nodejs_compat provides node:crypto / Buffer, which the admin auth uses.
   "compatibility_flags": ["nodejs_compat"],
   // Without this, esbuild's keepNames injects __name(...) helpers into
