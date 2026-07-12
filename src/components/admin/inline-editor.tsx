@@ -333,10 +333,12 @@ function PublishedStatusFloat({ slug }: { slug: string }) {
 
 type Override = { slug: string; source: string; kind: 'draft' | 'published'; author?: string };
 
-export function InlineEditor() {
+export function InlineEditor({ slug: slugProp }: { slug?: string } = {}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const slug = slugFromPath(pathname);
+  // Docs pages derive the slug from the URL; non-docs surfaces (the landing)
+  // pass their reserved slug explicitly.
+  const slug = slugProp ?? slugFromPath(pathname);
   const [admin, setAdmin] = useState(false);
   const [open, setOpen] = useState(false);
   // When set, the article shows this source instead of the (stale) build:

@@ -21,6 +21,11 @@ const OUT = path.join(ROOT, 'src', 'lib', 'content-manifest.generated.json');
 
 export function generateContentManifest() {
   const map = {};
+  // The landing page (slug 'home', outside content/docs so it stays out of
+  // docs nav/search) is editable like any doc — the editor needs its
+  // baseline source too.
+  const landingFile = path.join(ROOT, 'content', 'landing.mdx');
+  if (existsSync(landingFile)) map['home'] = readFileSync(landingFile, 'utf8');
   function walk(dir, prefix) {
     if (!existsSync(dir)) return;
     for (const name of readdirSync(dir)) {

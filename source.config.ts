@@ -1,4 +1,4 @@
-import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
+import { defineCollections, defineConfig, defineDocs } from 'fumadocs-mdx/config';
 import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
 import { remarkInstall } from 'fumadocs-docgen';
 
@@ -15,6 +15,16 @@ export const docs = defineDocs({
   meta: {
     schema: metaSchema,
   },
+});
+
+// The landing page's content: one MDX file of landing section components,
+// so the marketing page is editable (and agent-editable) like any doc —
+// while rendering through the same bespoke React sections as before.
+export const landing = defineCollections({
+  type: 'doc',
+  dir: 'content',
+  files: ['landing.mdx'],
+  schema: pageSchema,
 });
 
 export default defineConfig({
