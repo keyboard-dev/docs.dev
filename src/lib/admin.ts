@@ -172,9 +172,15 @@ export async function isAdmin(): Promise<boolean> {
   return (await readSession()) != null;
 }
 
+/** The reserved slug for the landing page (content/landing.mdx). */
+export const LANDING_SLUG = 'home';
+
 /** Repo-relative path for a slug, e.g. "reading-experience" → "content/docs/reading-experience.mdx". */
 export function docRepoPath(slug: string): string | null {
   const clean = slug.replace(/\.mdx$/, '').replace(/^\/+|\/+$/g, '');
+  // The landing page is content too — one MDX file outside content/docs so
+  // it never appears in docs nav or search.
+  if (clean === LANDING_SLUG) return 'content/landing.mdx';
   if (clean.length > 0 && !/^[a-z0-9][a-z0-9/-]*$/i.test(clean)) return null;
   return `content/docs/${clean === '' ? 'index' : clean}.mdx`;
 }

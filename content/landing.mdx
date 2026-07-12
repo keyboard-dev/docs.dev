@@ -1,0 +1,94 @@
+---
+title: docs.dev — AI drafts your docs. Your team makes them true.
+description: Point your coding agent at your repo and your docs; it opens a docs branch, your team reviews on the rendered page, publishing is a commit. Runs on your Cloudflare — no platform fee, no metered AI.
+---
+
+<LandingHero
+  eyebrow="Your repo · Your Cloudflare · Your agent"
+  headline1="AI drafts your docs."
+  headline2="Your team makes them true."
+  subhead="Point the coding agent you already pay for at your code and your docs. It opens a docs branch; your team reviews it on the rendered page and publishes with a commit. All of it runs in your GitHub and your Cloudflare."
+/>
+
+<LandingSection title="Docs that ship the way code ships.">
+  <StepGrid
+    steps={[
+      { step: '01', title: 'Ship the feature', body: 'Your code lands like it always does. The docs debt starts here — and so does the fix.' },
+      { step: '02', title: 'Your agent drafts the docs', body: 'Add your docs repo next to your code repo in Claude Code. One request — "document what changed" — and it opens a docs branch with drafted pages.' },
+      { step: '03', title: 'Your team reviews on the page', body: 'Teammates sign in and see the draft exactly as readers will — same layout, same type. Eyeball it, prune it, fix it in place.' },
+      { step: '04', title: 'Publishing is a commit', body: 'One button commits to your repo and the edge redeploys. Reviews, branches, and rollbacks come free, because it is just git.' },
+    ]}
+  />
+</LandingSection>
+
+<LandingSection
+  title="Stop paying the AI tax twice."
+  lede="Documentation platforms charge a subscription, then meter their AI on top — while your team already pays for Claude Code or Codex. docs.dev is a template, not a tenancy."
+>
+  <Compare
+    leftLabel="Docs platforms"
+    left="Monthly seat pricing. Their hosting. Their AI credits, metered. Your content in their database, and an export button you hope works when you leave."
+    rightLabel="docs.dev"
+    right="A repo you own on a Cloudflare account you control — the free tier goes a long way. Writing AI is the agent you already have; reader-facing AI runs on your Workers AI. No platform fee, no metered middleman."
+  />
+</LandingSection>
+
+<LandingSection title="AI-native, not AI-appended.">
+  <CardGrid
+    items={[
+      { title: 'Every page is also markdown', body: 'Append .md to any URL and get the raw page — the convention agents and LLM tooling already expect. Your docs are legible to machines by default.' },
+      { title: 'CLAUDE.md and skills in the box', body: 'The template ships agent instructions and skills, so "add a page", "fix the nav", or "draft this for review" are one-line requests from day one.' },
+      { title: 'Agents can set up the whole site', body: 'An agent can create the site, deploy it, and hand you one claim code. You sign in once, confirm, and own everything it built.' },
+      { title: 'Ask AI for your readers', body: 'An assistant answers questions from your pages, on your Workers AI. Readers stop guessing; you stop answering the same question twice.' },
+    ]}
+  />
+</LandingSection>
+
+<LandingSection
+  title="And they read like pages, not blocks."
+  lede="The reading experience is powered by pretext, a text-measurement layout engine. This section is the demo — it is running right now."
+>
+  <FlowDemo
+    intro="This paragraph is live — select it. Every line here is laid out by pretext, a text-measurement engine that computes line breaks with pure arithmetic instead of asking the browser to reflow. Because the engine knows exactly how wide each line can be, it can narrow a line to slip past an obstacle and widen it again once the obstacle ends. The planet to the right is a layout obstacle, not a floated image hack — the text genuinely flows around its bounding box, line by line, the way a magazine sets type around a photograph. None of this touches getBoundingClientRect or paints text to a canvas. The words you are reading are ordinary, selectable, screen-reader-friendly DOM text; pretext only decided where each line should sit."
+    body="Documentation is not just prose — it is prose interleaved with examples, diagrams, and asides, and in a conventional renderer each of those interrupts the reading flow. With a measurement-driven layout, the code sample sits in the margin while the explanation keeps flowing beside it, so your eye never leaves the paragraph to find the example it describes. The block on the left is exactly that: a real, syntax-highlighted sample pinned to the column edge with the text wrapping cleanly around it. Same Markdown you already write — rendered as a page someone actually wants to read."
+  />
+</LandingSection>
+
+<EdgeBanner
+  title1="Centered on Cloudflare,"
+  title2="running as you."
+  body="Every docs.dev site is a Worker in your Cloudflare account — served from the edge next to your readers, rebuilt on every push to your repo, billed on your plan. Add a custom domain in the dashboard and the site asks to bind it; one approval and it's live. There is no docs.dev server between your readers and your pages."
+/>
+
+<LandingSection
+  title="Built on parts you'd pick yourself."
+  lede="No proprietary renderer, no mystery hosting. docs.dev assembles three things you can read the source of — and you keep all of them if you ever leave."
+>
+  <CardGrid
+    columns={3}
+    items={[
+      { kicker: 'The reading engine', title: 'pretext', body: 'A text-measurement engine that lays out every line with pure arithmetic, so prose flows around figures like a magazine page.', href: '/engine' },
+      { kicker: 'The docs framework', title: 'Fumadocs', body: 'MDX pages, sidebar and search, API reference generation from OpenAPI specs — the boring parts of a docs site, done properly in the open.', href: 'https://fumadocs.dev' },
+      { kicker: 'The platform', title: 'Cloudflare', body: 'Your site is a Worker on your account: push-to-deploy builds, Workers AI for drafting and images, custom domains one approval away.', href: 'https://workers.cloudflare.com' },
+    ]}
+  />
+</LandingSection>
+
+<LandingSection title="Everything yours. Nothing to migrate off of.">
+  <CardGrid
+    columns={3}
+    items={[
+      { title: 'Your repo is the source of truth', body: 'Every page is MDX in your GitHub repository. Nothing to export, nothing to escape — leaving docs.dev costs you nothing, which is exactly why you can trust it.', href: '/docs/editing' },
+      { title: 'Review-before-publish drafts', body: 'Shared drafts live on a branch, render exactly like the real page, and publish or discard with one click.', href: '/docs/editing' },
+      { title: 'Commits attributed to the editor', body: 'Teammates publish as themselves — git blame on your docs means something. No shared bot token required.', href: '/docs/team' },
+      { title: 'Team sign-in', body: 'Invite teammates with docs.dev accounts — central membership, roles, and revocation. No shared credentials.', href: '/docs/team' },
+      { title: 'Custom domains, one approval', body: 'Add a domain in Cloudflare, open /admin on it, click Approve in your dashboard. No tokens to re-paste, ever.', href: '/docs/getting-started' },
+      { title: 'Know what readers ask', body: 'Anonymous Ask-AI insights show what people searched for and what the docs could not answer — a bug tracker for your documentation.', href: '/docs/ai' },
+    ]}
+  />
+</LandingSection>
+
+<LandingCTA
+  title="Your docs, live in two minutes."
+  body="Create a site and deploy it in one click — or hand the prompt to your agent and just claim the result. This entire site is the template."
+/>
