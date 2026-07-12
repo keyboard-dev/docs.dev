@@ -2,6 +2,8 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Flow, type Obstacle } from '@/components/pretext/flow';
 import { AgentPrompt } from './agent-prompt';
+import { EditHero } from './edit-hero';
+import landing from '../../../content/landing.json';
 
 export const metadata: Metadata = {
   title: { absolute: 'docs.dev — AI drafts your docs. Your team makes them true.' },
@@ -157,18 +159,15 @@ export default function HomePage() {
       <section className="relative pt-20 pb-14">
         <div className="docsdev-glow" aria-hidden />
         <p className="relative mb-3 font-mono text-[13px] uppercase tracking-[0.14em] text-[#818cf8]">
-          Your repo · Your Cloudflare · Your agent
+          {landing.eyebrow}
         </p>
         <h1 className="m-0 text-[44px] font-extrabold leading-[1.05] tracking-[-0.02em] sm:text-[56px]">
-          AI drafts your docs.
+          {landing.headline1}
           <br />
-          Your team makes them true.
+          {landing.headline2}
         </h1>
         <p className="mt-6 max-w-[600px] text-[17px] leading-relaxed text-fd-muted-foreground">
-          Point the coding agent you already pay for at your code and your
-          docs. It opens a docs branch; your team reviews it on the rendered
-          page and publishes with a commit. All of it runs in <em>your</em>{' '}
-          GitHub and <em>your</em> Cloudflare.
+          {landing.subhead}
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <a
@@ -399,6 +398,8 @@ export default function HomePage() {
           </a>
         </div>
       </section>
+
+      <EditHero initial={landing} />
 
       <footer className="mt-20 text-center text-[13px] text-fd-muted-foreground">
         Built with ♥ by the{' '}
