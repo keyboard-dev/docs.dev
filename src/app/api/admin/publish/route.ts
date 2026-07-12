@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const cred = await repoCredential(session);
   if (!cred) {
     return NextResponse.json(
-      { ok: false, error: 'No GitHub credential available (sign in with GitHub or configure GITHUB_PAT).' },
+      { ok: false, error: 'No GitHub credential available. Connect GitHub in your docs.dev dashboard (Connected accounts), or configure GITHUB_PAT.' },
       { status: 500 },
     );
   }

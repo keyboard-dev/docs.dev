@@ -20,6 +20,7 @@
 
 import { gitConfig } from './shared';
 import type { Session } from './admin';
+import { ssoIssuer } from './docsdev-sso';
 
 export function githubOAuthConfigured(): boolean {
   return Boolean(process.env.GITHUB_APP_CLIENT_ID && process.env.GITHUB_APP_CLIENT_SECRET) || githubOAuthMocked();
@@ -96,18 +97,52 @@ export async function hasPushAccess(token: string): Promise<boolean> {
   return Boolean(data.permissions?.push || data.permissions?.maintain || data.permissions?.admin);
 }
 
-/** A usable token for repo writes on behalf of the session, refreshing the
- *  GitHub user token when it's about to expire. Returns the token and, when a
- *  refresh happened, the updated session to re-seal into the cookie. */
 /** The credential to use for repo writes: the signed-in user's token when
- *  available (commits attributed to the editor), else the server PAT. */
+ *  available (commits attributed to the editor), else the server PAT. For
+ *  docs.dev SSO sessions the user's own GitHub token comes from the issuer
+ *  (captured there at sign-in), so publishing works with no GITHUB_PAT. */
 export async function repoCredential(session: Session | null): Promise<{ token: string; updated?: Session } | null> {
   if (session && !githubOAuthMocked()) {
     const user = await userTokenFor(session);
     if (user) return user;
+    if (session.method === 'docsdev' && session.ssoJwt) {
+      const token = await ssoGithubToken(session.ssoJwt);
+      if (token) return { token };
+    }
   }
   const pat = process.env.GITHUB_PAT ?? process.env.GITHUB_TOKEN;
   return pat ? { token: pat } : null;
+}
+
+// Per-isolate cache of issuer-held GitHub tokens, keyed by session JWT (the
+// JWT is short-lived, so entries age out with their sessions). A null entry
+// means the issuer answered "none on file" — don't re-ask on every publish.
+const ssoTokenCache = new Map<string, { token: string | null; expires: number }>();
+const SSO_TOKEN_TTL_MS = 5 * 60_000;
+
+/**
+ * Redeem a docs.dev session JWT for the editor's own GitHub access token
+ * (the one WorkOS captured when they signed in to docs.dev with GitHub).
+ * Server-to-server; 404 means fall back to GITHUB_PAT.
+ */
+async function ssoGithubToken(ssoJwt: string): Promise<string | null> {
+  const cached = ssoTokenCache.get(ssoJwt);
+  if (cached && cached.expires > Date.now()) return cached.token;
+
+  let token: string | null = null;
+  try {
+    const res = await fetch(new URL('/api/v1/github/token', ssoIssuer()), {
+      headers: { authorization: `Bearer ${ssoJwt}` },
+    });
+    if (res.ok) {
+      token = ((await res.json()) as { token?: string }).token ?? null;
+    }
+  } catch {
+    return null; // issuer unreachable — don't cache, retry next time
+  }
+  if (ssoTokenCache.size > 500) ssoTokenCache.clear(); // bound isolate memory
+  ssoTokenCache.set(ssoJwt, { token, expires: Date.now() + SSO_TOKEN_TTL_MS });
+  return token;
 }
 
 export async function userTokenFor(session: Session): Promise<{ token: string; updated?: Session } | null> {
