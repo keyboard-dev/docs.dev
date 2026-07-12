@@ -60,6 +60,13 @@ export type Session = {
   /** Epoch ms when ghToken expires. */
   ghTokenExp?: number;
   ghRefresh?: string;
+  /**
+   * The docs.dev session JWT (only for method: 'docsdev') — lets the server
+   * redeem the editor's own GitHub token from the issuer at publish time,
+   * so commits attribute to the editor without a GITHUB_PAT. Never sent to
+   * the browser beyond the cookie it already lives in.
+   */
+  ssoJwt?: string;
   /** Epoch ms when the session itself expires. */
   exp: number;
 };
@@ -151,6 +158,7 @@ export async function readSession(): Promise<Session | null> {
       login: sso.email,
       name: sso.email.split('@')[0] || sso.email,
       role: sso.role,
+      ssoJwt: token,
       exp: Date.now() + SESSION_MAX_AGE_S * 1000, // real expiry enforced by the JWT itself
     };
   }
