@@ -1,0 +1,10 @@
+# Deploy to Cloudflare reads this file to render a pre-labeled secret field
+# in the deploy form (users paste only the value), and `wrangler dev` uses a
+# copy of it (as .dev.vars) for local development.
+#
+# DOCSDEV_SITE_TOKEN — the site token (dst_…) from your app.docs.dev
+# dashboard card. It binds this deployment to your team on first boot and
+# stays with the Worker (as a secret) so custom domains you add later can
+# request approval automatically. Connecting later from /admin instead?
+# Enter: unset
+DOCSDEV_SITE_TOKEN=
