@@ -26,6 +26,15 @@ const withMDX = createMDX();
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
+  // Remote images the site may render: the brand wordmark on Framer's CDN
+  // and fal.media output from the editor's image generation.
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'framerusercontent.com' },
+      { protocol: 'https', hostname: 'fal.media' },
+      { protocol: 'https', hostname: '*.fal.media' },
+    ],
+  },
   env: {
     NEXT_PUBLIC_BUILD_COMMIT: buildInfo.commit,
     NEXT_PUBLIC_BUILD_BRANCH: buildInfo.branch,

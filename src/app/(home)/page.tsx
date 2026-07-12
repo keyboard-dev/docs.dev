@@ -22,13 +22,16 @@ const orb: Obstacle = {
   top: 8,
   gap: 28,
   node: (
-    <div
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/landing/docs-planet.png"
+      alt="A planet made of documentation pages"
       style={{
         width: '100%',
         height: '100%',
         borderRadius: '50%',
-        background: 'radial-gradient(circle at 35% 30%, #a5b4fc 0%, #6366f1 40%, #1e1b4b 100%)',
-        boxShadow: '0 0 70px 14px rgba(99,102,241,0.45), inset -16px -20px 50px rgba(0,0,0,0.5)',
+        objectFit: 'cover',
+        boxShadow: '0 0 70px 14px rgba(99,102,241,0.35)',
       }}
     />
   ),
@@ -150,6 +153,93 @@ export default function HomePage() {
         <Flow text={intro} obstacles={[orb]} />
         <div className="h-14" />
         <Flow text={body} obstacles={[codeBox]} />
+      </section>
+
+      {/* Built on */}
+      <section className="mt-24">
+        <h2 className="mb-3 text-[26px] font-bold tracking-[-0.01em]">
+          Built on parts you&apos;d pick yourself.
+        </h2>
+        <p className="mb-8 max-w-[620px] text-[15px] leading-relaxed text-fd-muted-foreground">
+          No proprietary renderer, no mystery hosting. docs.dev assembles three
+          things you can read the source of — and you keep all of them if you
+          ever leave.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Link
+            href="/engine"
+            className="rounded-2xl border border-fd-border p-6 no-underline transition-colors hover:bg-fd-accent"
+          >
+            <p className="m-0 mb-1 font-mono text-[12px] uppercase tracking-[0.12em] text-[#818cf8]">
+              The reading engine
+            </p>
+            <h3 className="mb-2 text-[17px] font-semibold">pretext</h3>
+            <p className="m-0 text-[14px] leading-relaxed text-fd-muted-foreground">
+              A text-measurement engine that lays out every line with pure
+              arithmetic, so prose flows around figures like a magazine page.
+              The demo above is it, live.
+            </p>
+          </Link>
+          <a
+            href="https://fumadocs.dev"
+            className="rounded-2xl border border-fd-border p-6 no-underline transition-colors hover:bg-fd-accent"
+          >
+            <p className="m-0 mb-1 font-mono text-[12px] uppercase tracking-[0.12em] text-[#818cf8]">
+              The docs framework
+            </p>
+            <h3 className="mb-2 text-[17px] font-semibold">Fumadocs</h3>
+            <p className="m-0 text-[14px] leading-relaxed text-fd-muted-foreground">
+              MDX pages, sidebar and search, API reference generation from
+              OpenAPI specs — the boring parts of a docs site, done properly
+              in the open.
+            </p>
+          </a>
+          <a
+            href="https://workers.cloudflare.com"
+            className="rounded-2xl border border-fd-border p-6 no-underline transition-colors hover:bg-fd-accent"
+          >
+            <p className="m-0 mb-1 font-mono text-[12px] uppercase tracking-[0.12em] text-[#818cf8]">
+              The platform
+            </p>
+            <h3 className="mb-2 text-[17px] font-semibold">Cloudflare</h3>
+            <p className="m-0 text-[14px] leading-relaxed text-fd-muted-foreground">
+              Your site is a Worker on your account: push-to-deploy builds,
+              Workers AI for drafting and images, custom domains one approval
+              away.
+            </p>
+          </a>
+        </div>
+      </section>
+
+      {/* Cloudflare / edge */}
+      <section className="mt-24">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/landing/edge-network.png"
+          alt="Documentation served from a global edge network"
+          className="w-full rounded-3xl border border-fd-border"
+        />
+        <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2">
+          <div>
+            <h2 className="m-0 text-[26px] font-bold tracking-[-0.01em]">
+              Centered on Cloudflare,
+              <br />
+              running as you.
+            </h2>
+          </div>
+          <div className="text-[15px] leading-relaxed text-fd-muted-foreground">
+            <p className="m-0">
+              Every docs.dev site is a Worker in <em>your</em> Cloudflare
+              account — served from Cloudflare&apos;s edge next to your
+              readers, rebuilt on every push to your repo, billed on your
+              plan (the free tier goes a long way). Add a custom domain in
+              the dashboard and the site asks to bind it; one approval and
+              it&apos;s live. Workers AI drafts prose and generates images
+              on the same account. There is no docs.dev server between your
+              readers and your pages.
+            </p>
+          </div>
+        </div>
       </section>
 
       {/* Features */}
