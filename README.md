@@ -10,6 +10,10 @@ the repo is yours: edit it by hand, in the GitHub UI, or point
 [Claude Code](https://claude.com/claude-code) at it — the repo ships a
 `CLAUDE.md` and skills so an agent is productive immediately.
 
+> **Requires the Workers Paid plan** ($5/month): the server Worker is
+> ~5.3 MiB gzipped, over the free plan's 1 MiB script limit (deploys fail
+> with error 10027) and well within the paid plan's 10 MiB.
+
 No Cloudflare account? A coding agent can launch this template for you on a
 temporary Cloudflare account and sign you up for docs.dev along the way — you
 confirm a code and click one claim link. See **[LAUNCH.md](LAUNCH.md)** for

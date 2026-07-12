@@ -14,12 +14,13 @@ docs.dev account, no dashboard visits. It combines two mechanisms:
 The user performs exactly two actions, both human-friendly: confirm a 6-digit
 code, and click a claim link within 60 minutes.
 
-> **Known blocker (2026-07):** temporary accounts sit on the Workers free
-> plan, whose **1 MiB** compressed script limit rejects this template's
-> Worker (~5.3 MiB gzipped; API error 10027). Until the flow ships a slimmer
-> preview Worker, step 2 cannot complete on a temporary account — the deploy
-> needs an existing Cloudflare account on the Workers Paid plan (10 MiB).
-> The registration half (steps 1 and 3) works and is testable on its own.
+> **Requires a Cloudflare Workers Paid account (2026-07):** this template's
+> server Worker is ~5.3 MiB gzipped — over the free plan's **1 MiB** script
+> limit (deploys are rejected with API error 10027) and comfortably within
+> the paid plan's **10 MiB** ($5/month). Temporary accounts sit on the free
+> plan, so the no-account `--temporary` path above cannot complete today;
+> deploy to the user's paid account instead (see step 2). The docs.dev
+> registration half (steps 1 and 3) works either way.
 
 ## The prompt (copy-paste for users)
 
@@ -106,8 +107,13 @@ Notes:
   resets the clock). Don't dawdle between steps — and if the user hasn't
   clicked the claim link as the window runs low, proactively redeploy
   (`--temporary` again) to reset it rather than letting the site vanish.
-- The deploy is currently expected to fail with API error 10027 (script size
-  over the free-plan 1 MiB limit) — see the known-blocker note at the top.
+- **The `--temporary` deploy currently fails with API error 10027** (script
+  size over the free-plan 1 MiB limit — see the note at the top). Until
+  temporary accounts support larger Workers, deploy to the user's existing
+  **Workers Paid** account instead: authenticate (`npx wrangler login`, or
+  have the user provide a `CLOUDFLARE_API_TOKEN` env var), drop the
+  `--temporary` flag from the deploy commands in steps 2 and 3, and skip the
+  claim-link parts of step 4 — the deployment already belongs to the user.
 
 ### 3. Register the site and inject the Site ID
 
@@ -167,6 +173,6 @@ they own. Sensible next steps to offer:
 | `invalid_redirect_uri` registering the site | The redirect URI must be exactly `https://$HOST/api/admin/sso/callback` — https, no trailing slash, no fragment. |
 | "Could not start remote dev session" / login prompt during deploy | The `ai` remote binding forces an authenticated proxy session. Remove the `"ai"` block from `wrangler.jsonc` before deploying (see step 2). |
 | `Unknown argument: temporary` | The repo-local wrangler is < 4.102.0 (`npx wrangler@latest` doesn't help — the OpenNext delegation runs the local install). Update the `wrangler` devDependency. |
-| Rejected with error 10027 (size limit) | Temporary accounts are free-plan: 1 MiB compressed Worker limit vs this template's ~5.3 MiB. Currently a hard blocker — see the note at the top. |
+| Rejected with error 10027 (size limit) | The account is on the Workers free plan: 1 MiB compressed script limit vs this template's ~5.3 MiB. Deploy to a Workers Paid account (10 MiB) — temporary accounts are always free-plan, so this ends the `--temporary` path. See the note at the top. |
 | Temp deployment vanished | The 60-minute window lapsed. Redeploy (`--temporary` again) and re-register the new hostname if it changed. |
 | 401 from `/api/v1/sites` | Access token expired — jwt-bearer exchange the `identity_assertion` for a fresh one. |
