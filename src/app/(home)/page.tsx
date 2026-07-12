@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { landing } from 'collections/server';
 import { getMDXComponents } from '@/components/mdx';
@@ -29,7 +30,9 @@ export default function HomePage() {
       <article className="flex flex-col gap-4">
         <MDX components={getMDXComponents()} />
       </article>
-      <InlineEditor slug={LANDING_SLUG} />
+      <Suspense>
+        <InlineEditor slug={LANDING_SLUG} />
+      </Suspense>
       <footer className="mt-20 text-center text-[13px] text-fd-muted-foreground">
         Built with ♥ by the{' '}
         <a href="https://keyboard.dev" className="underline hover:text-fd-foreground">
