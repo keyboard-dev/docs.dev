@@ -94,6 +94,38 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* ------------------------------------------------------------------ */
+/* brand scheme — deep navy + indigo (dark-first)                      */
+/* ------------------------------------------------------------------ */
+
+/* Dark is the brand's home: near-black navy surfaces with an indigo
+   accent, matching the marketing identity. Light mode stays untouched
+   and fully usable via the theme toggle. */
+.dark {
+  --color-fd-background: #08080f;
+  --color-fd-card: #0d0d17;
+  --color-fd-popover: #0d0d17;
+  --color-fd-border: rgba(148, 163, 255, 0.14);
+  --color-fd-primary: #818cf8;
+  --color-fd-ring: #6366f1;
+}
+
+/* Soft violet bloom behind the landing hero — one element, no images,
+   echoing the glow of the brand's marketing pages. */
+.docsdev-glow {
+  position: absolute;
+  top: -160px;
+  left: 50%;
+  width: 100vw;
+  max-width: 1600px;
+  height: 680px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background:
+    radial-gradient(560px 340px at 66% 22%, rgba(99, 102, 241, 0.2), transparent 68%),
+    radial-gradient(420px 280px at 30% 46%, rgba(129, 140, 248, 0.09), transparent 68%);
+}
+
 html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
