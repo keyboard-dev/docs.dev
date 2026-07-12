@@ -1,4 +1,5 @@
 import { RootProvider } from 'fumadocs-ui/provider/next';
+import { resolveSiteId } from '@/lib/docsdev-sso';
 import './global.css';
 
 /**
@@ -7,7 +8,12 @@ import './global.css';
  * The latin subsets are preloaded so pretext measures against the real
  * fonts on first paint.
  */
-export default function Layout({ children }: LayoutProps<'/'>) {
+export default async function Layout({ children }: LayoutProps<'/'>) {
+  // docs.dev-first onboarding: with a setup token deployed, the first page
+  // view redeems it (binding this hostname to the dashboard-created site)
+  // so the dashboard card flips without anyone visiting /admin. Cached per
+  // isolate; a no-op for every deployment without the token.
+  if (process.env.DOCSDEV_SITE_TOKEN) await resolveSiteId();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

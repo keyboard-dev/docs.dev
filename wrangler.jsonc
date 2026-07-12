@@ -3,6 +3,11 @@
   "name": "docsdotdev",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-25",
+  // The site must be reachable the moment it deploys: keep the production
+  // <worker>.<subdomain>.workers.dev URL and per-version preview URLs
+  // enabled regardless of the account's dashboard defaults.
+  "workers_dev": true,
+  "preview_urls": true,
   // nodejs_compat provides node:crypto / Buffer, which the admin auth uses.
   "compatibility_flags": ["nodejs_compat"],
   // Without this, esbuild's keepNames injects __name(...) helpers into
@@ -49,9 +54,16 @@
   //                                user authorization, install on the repo)
   //   TAVILY_API_KEY or BRAVE_API_KEY — optional web search grounding for
   //                                "Generate with AI" (skipped when unset)
+  // The ONE field the Deploy to Cloudflare button asks about. Creating a
+  // site at app.docs.dev first hands you a one-time setup token (dst_…) —
+  // paste it here during the button flow and the deployed site binds itself
+  // to your team automatically. Leave blank if you didn't start there
+  // (connect later from /admin instead).
+  "vars": {
+    "DOCSDEV_SITE_TOKEN": ""
+  },
   //
-  // Zero-config by default — no "vars" block, so the Deploy to Cloudflare
-  // button prompts for nothing:
+  // Otherwise zero-config — the button prompts for nothing else:
   //   - The publish target repo/branch is detected from this checkout's git
   //     remote at build time (scripts/gen-repo-info.mjs). Override with
   //     GITHUB_OWNER / GITHUB_REPO / GITHUB_BRANCH env vars if needed.

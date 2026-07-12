@@ -44,9 +44,14 @@ export function generateRepoInfo(rootDir = path.dirname(path.dirname(fileURLToPa
 
   const json = `${JSON.stringify(info, null, 2)}\n`;
   try {
-    if (readFileSync(outFile, 'utf8') === json) return;
+    const existing = JSON.parse(readFileSync(outFile, 'utf8'));
+    // Same repo, different branch = working on a feature branch of the repo
+    // the file already records. Keep the committed value: rewriting would
+    // dirty the tree on every local build, and the branch recorded here is
+    // the publish default, not the checkout branch.
+    if (existing.owner === info.owner && existing.repo === info.repo) return;
   } catch {
-    /* missing file — write it */
+    /* missing or invalid file — write it */
   }
   writeFileSync(outFile, json);
   console.log(`repo-info: publishing to ${info.owner}/${info.repo}@${info.branch}`);
