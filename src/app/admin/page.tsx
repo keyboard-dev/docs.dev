@@ -17,6 +17,7 @@ export default function AdminPage() {
   const [ghAvailable, setGhAvailable] = useState(false);
   const [connectUrl, setConnectUrl] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState(false);
+  const [awaitingClaim, setAwaitingClaim] = useState(false);
   const [dashboardUrl, setDashboardUrl] = useState<string | null>(null);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -33,6 +34,7 @@ export default function AdminPage() {
         setPinConfigured(d.pinConfigured !== false);
         setConnectUrl(typeof d.connect === 'string' ? d.connect : null);
         setPendingApproval(!!d.pendingApproval);
+        setAwaitingClaim(!!d.awaitingClaim);
         setDashboardUrl(typeof d.dashboard === 'string' ? d.dashboard : null);
         setUser(d.user ?? null);
       })
@@ -96,7 +98,13 @@ export default function AdminPage() {
     return (
       <main style={shell}>
         <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>docs.dev admin</h1>
-        {pendingApproval ? (
+        {awaitingClaim ? (
+          <p style={{ background: '#fdf6e6', border: '1px solid #e8d29a', color: '#7a5c12', borderRadius: 10, padding: '12px 16px', fontSize: 14, marginBottom: 20 }}>
+            ⏳ This site is ready — it just needs to be claimed. Open the claim link your agent
+            gave you and confirm the code, then refresh this page. Team sign-in stays locked
+            until the site has an owner.
+          </p>
+        ) : pendingApproval ? (
           <>
             <p style={{ background: '#fdf6e6', border: '1px solid #e8d29a', color: '#7a5c12', borderRadius: 10, padding: '12px 16px', fontSize: 14, marginBottom: 20 }}>
               ⏳ This domain is waiting for approval. It asked to join your docs.dev site — a

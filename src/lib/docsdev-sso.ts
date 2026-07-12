@@ -48,9 +48,13 @@ export async function requestHost(): Promise<string | null> {
 }
 
 // Per-isolate lookup cache. Positive answers are stable (sites rarely
-// disconnect); negative ones expire fast so /connect flips the site to
+// disconnect); negative ones — including "exists but not claimed yet" —
+// expire fast so /connect or the claim ceremony flips the site to
 // configured within seconds.
-const siteIdCache = new Map<string, { siteId: string | null; expires: number }>();
+const siteIdCache = new Map<
+  string,
+  { siteId: string | null; awaitingClaim: boolean; expires: number }
+>();
 const POSITIVE_TTL_MS = 5 * 60_000;
 const NEGATIVE_TTL_MS = 15_000;
 
@@ -75,22 +79,26 @@ const NEGATIVE_TTL_MS = 15_000;
 // statically prerendered page that touches a dynamic API at runtime is a
 // hard Next error ("Page changed from static to dynamic"), which took the
 // whole site down when this briefly lived in the root layout.
-const claimCache = new Map<string, { siteId: string | null; pending: boolean; expires: number }>();
+const claimCache = new Map<
+  string,
+  { siteId: string | null; pending: boolean; awaitingClaim: boolean; expires: number }
+>();
 const CLAIM_RETRY_MS = 60_000;
 
 async function claimHostWithSiteToken(
   host: string,
-): Promise<{ siteId: string | null; pending: boolean }> {
+): Promise<{ siteId: string | null; pending: boolean; awaitingClaim: boolean }> {
+  const none = { siteId: null, pending: false, awaitingClaim: false };
   // Anything that isn't a dst_… token counts as unset — in particular the
   // "unset" placeholder scripts/cf-deploy.mjs seeds so that deploys succeed
   // before a real token exists.
   const token = process.env.DOCSDEV_SITE_TOKEN;
-  if (!token?.startsWith('dst_')) return { siteId: null, pending: false };
+  if (!token?.startsWith('dst_')) return none;
 
   const cached = claimCache.get(host);
   if (cached && cached.expires > Date.now()) return cached;
 
-  let outcome: { siteId: string | null; pending: boolean } = { siteId: null, pending: false };
+  let outcome: { siteId: string | null; pending: boolean; awaitingClaim: boolean } = none;
   try {
     const res = await fetch(new URL('/api/v1/sites/claim-host', ssoIssuer()), {
       method: 'POST',
@@ -98,11 +106,16 @@ async function claimHostWithSiteToken(
       body: JSON.stringify({ setup_token: token, host }),
     });
     if (res.ok) {
-      const body = (await res.json()) as { site_id?: string; status?: string };
-      outcome =
-        body.status === 'pending_approval'
-          ? { siteId: null, pending: true } // approval flips the lookup, not this call
-          : { siteId: body.site_id ?? null, pending: false };
+      const body = (await res.json()) as { site_id?: string; status?: string; claimed?: boolean };
+      if (body.status === 'pending_approval') {
+        outcome = { siteId: null, pending: true, awaitingClaim: false }; // approval flips the lookup, not this call
+      } else if (body.site_id && body.claimed === false) {
+        // Agent-provisioned site: bound, but its user hasn't confirmed the
+        // claim code — sign-in stays off until the lookup reports claimed.
+        outcome = { siteId: null, pending: false, awaitingClaim: true };
+      } else {
+        outcome = { siteId: body.site_id ?? null, pending: false, awaitingClaim: false };
+      }
     }
     // Non-ok (rotated token, host taken, …) caches as a plain miss — the
     // lookup stays the source of truth either way.
@@ -117,6 +130,11 @@ export interface SiteAccess {
   siteId: string | null;
   /** This hostname was proposed to docs.dev and awaits an admin's approval. */
   pendingApproval: boolean;
+  /**
+   * The site exists but was set up by an agent and its user hasn't
+   * confirmed the claim code yet — sign-in is disabled until they do.
+   */
+  awaitingClaim: boolean;
 }
 
 /**
@@ -128,39 +146,59 @@ export interface SiteAccess {
  */
 export async function resolveSiteAccess(): Promise<SiteAccess> {
   if (process.env.DOCSDEV_SITE_ID) {
-    return { siteId: process.env.DOCSDEV_SITE_ID, pendingApproval: false };
+    return { siteId: process.env.DOCSDEV_SITE_ID, pendingApproval: false, awaitingClaim: false };
   }
 
   const host = await requestHost();
-  if (!host) return { siteId: null, pendingApproval: false };
+  if (!host) return { siteId: null, pendingApproval: false, awaitingClaim: false };
 
-  const cached = siteIdCache.get(host);
-  if (cached && cached.expires > Date.now() && cached.siteId) {
-    return { siteId: cached.siteId, pendingApproval: false };
+  let cached = siteIdCache.get(host);
+  if (cached && cached.expires <= Date.now()) cached = undefined;
+  if (cached?.siteId) {
+    return { siteId: cached.siteId, pendingApproval: false, awaitingClaim: false };
+  }
+  if (cached?.awaitingClaim) {
+    return { siteId: null, pendingApproval: false, awaitingClaim: true };
   }
 
   let siteId: string | null = null;
-  if (!cached || cached.expires <= Date.now()) {
+  let awaitingClaim = false;
+  if (!cached) {
     try {
       const res = await fetch(new URL(`/api/v1/sites/lookup?host=${host}`, ssoIssuer()));
       if (res.ok) {
-        siteId = ((await res.json()) as { site_id?: string }).site_id ?? null;
+        const body = (await res.json()) as { site_id?: string; claimed?: boolean };
+        // claimed:false = agent-provisioned site whose user hasn't confirmed
+        // the claim code yet. Sign-in must stay off (authorize refuses it),
+        // so we surface the waiting state instead of a site id, and expire
+        // it fast so confirming the code flips this within seconds.
+        if (body.site_id && body.claimed === false) {
+          awaitingClaim = true;
+        } else {
+          siteId = body.site_id ?? null;
+        }
       }
     } catch {
       siteId = null; // issuer unreachable — treat as unconfigured, retry soon
     }
     siteIdCache.set(host, {
       siteId,
+      awaitingClaim,
       expires: Date.now() + (siteId ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS),
     });
+    if (awaitingClaim) return { siteId: null, pendingApproval: false, awaitingClaim: true };
   }
-  if (siteId) return { siteId, pendingApproval: false };
+  if (siteId) return { siteId, pendingApproval: false, awaitingClaim: false };
 
   const claimed = await claimHostWithSiteToken(host);
   if (claimed.siteId) {
-    siteIdCache.set(host, { siteId: claimed.siteId, expires: Date.now() + POSITIVE_TTL_MS });
+    siteIdCache.set(host, {
+      siteId: claimed.siteId,
+      awaitingClaim: false,
+      expires: Date.now() + POSITIVE_TTL_MS,
+    });
   }
-  return { siteId: claimed.siteId, pendingApproval: claimed.pending };
+  return { siteId: claimed.siteId, pendingApproval: claimed.pending, awaitingClaim: claimed.awaitingClaim };
 }
 
 export async function resolveSiteId(): Promise<string | null> {
