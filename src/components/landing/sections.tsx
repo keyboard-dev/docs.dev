@@ -22,11 +22,15 @@ export function LandingHero({
   headline1,
   headline2,
   subhead,
+  videoId,
+  videoTitle,
 }: {
   eyebrow: string;
   headline1: string;
   headline2: string;
   subhead: string;
+  videoId?: string;
+  videoTitle?: string;
 }) {
   return (
     <section className="relative pt-20 pb-14">
@@ -55,6 +59,7 @@ export function LandingHero({
         </a>
       </div>
       <AgentPrompt />
+      {videoId && <VideoShowcase videoId={videoId} title={videoTitle ?? headline1} />}
     </section>
   );
 }
@@ -121,6 +126,22 @@ export function CardGrid({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+export function VideoShowcase({ videoId, title }: { videoId: string; title: string }) {
+  return (
+    <div className="relative mt-8 aspect-video w-full overflow-hidden rounded-3xl border border-fd-border shadow-[0_0_32px_rgba(99,102,241,0.12)]">
+      <iframe
+        src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+        title={title}
+        loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+        referrerPolicy="strict-origin-when-cross-origin"
+        className="absolute inset-0 h-full w-full border-0"
+      />
     </div>
   );
 }

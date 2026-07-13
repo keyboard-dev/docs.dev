@@ -12,6 +12,7 @@ import {
   LandingHero,
   LandingSection,
   StepGrid,
+  VideoShowcase,
 } from '@/components/landing/sections';
 import { DraftImage } from '@/components/draft-image';
 
@@ -39,6 +40,7 @@ export function getMDXComponents(components?: MDXComponents) {
     FlowDemo,
     EdgeBanner,
     LandingCTA,
+    VideoShowcase,
     ...components,
   } satisfies MDXComponents;
 }
