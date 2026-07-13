@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { Flow, type Obstacle } from '@/components/pretext/flow';
 import { AgentPrompt } from '@/app/(home)/agent-prompt';
+
+export { FlowDemo } from './flow-demo';
 
 /**
  * The landing page's building blocks. The page itself is MDX
@@ -12,9 +13,9 @@ import { AgentPrompt } from '@/app/(home)/agent-prompt';
 const DEPLOY_URL = 'https://deploy.workers.cloudflare.com/?url=https://github.com/keyboard-dev/docs.dev';
 
 const pill =
-  'rounded-full bg-[#1c1a2e] px-6 py-3 text-[15px] font-semibold text-white no-underline shadow-[0_0_24px_rgba(99,102,241,0.35)] transition-transform hover:scale-[1.02] dark:bg-white dark:text-[#0a0a14]';
+  'whitespace-nowrap rounded-full bg-[#1c1a2e] px-6 py-3 text-center text-[15px] font-semibold text-white no-underline shadow-[0_0_24px_rgba(99,102,241,0.35)] transition-transform hover:scale-[1.02] dark:bg-white dark:text-[#0a0a14]';
 const pillGhost =
-  'rounded-full border border-fd-border px-6 py-3 text-[15px] font-semibold no-underline transition-colors hover:bg-fd-accent';
+  'whitespace-nowrap rounded-full border border-fd-border px-6 py-3 text-center text-[15px] font-semibold no-underline transition-colors hover:bg-fd-accent';
 
 export function LandingHero({
   eyebrow,
@@ -33,7 +34,7 @@ export function LandingHero({
       <p className="relative mb-3 font-mono text-[13px] uppercase tracking-[0.14em] text-[#818cf8]">
         {eyebrow}
       </p>
-      <h1 className="m-0 text-[44px] font-extrabold leading-[1.05] tracking-[-0.02em] sm:text-[56px]">
+      <h1 className="m-0 text-[36px] font-extrabold leading-[1.05] tracking-[-0.02em] sm:text-[44px] md:text-[56px]">
         {headline1}
         <br />
         {headline2}
@@ -139,59 +140,6 @@ export function Compare({ leftLabel, left, rightLabel, right }: { leftLabel: str
   );
 }
 
-export function FlowDemo({ intro, body }: { intro: string; body: string }) {
-  const orb: Obstacle = {
-    id: 'orb',
-    side: 'right',
-    width: 220,
-    height: 220,
-    top: 8,
-    gap: 28,
-    node: (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src="/landing/docs-planet.png"
-        alt="A planet made of documentation pages"
-        style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 0 70px 14px rgba(99,102,241,0.35)' }}
-      />
-    ),
-  };
-  const codeBox: Obstacle = {
-    id: 'code',
-    side: 'left',
-    width: 300,
-    height: 168,
-    top: 12,
-    gap: 28,
-    node: (
-      <pre
-        style={{
-          margin: 0, width: '100%', height: '100%', boxSizing: 'border-box', padding: '16px 18px',
-          borderRadius: 12, background: '#0d1117', color: '#c9d1d9', fontSize: 13, lineHeight: '20px',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
-      >
-        <code>{`import { prepare,
-  layout } from
-  '@chenglou/pretext';
-
-const t = prepare(
-  text, font);
-layout(t, 640, 32);
-// → { lineCount, height }`}</code>
-      </pre>
-    ),
-  };
-  return (
-    <div className="mt-10">
-      <Flow text={intro} obstacles={[orb]} />
-      <div className="h-14" />
-      <Flow text={body} obstacles={[codeBox]} />
-    </div>
-  );
-}
-
 export function EdgeBanner({ title1, title2, body }: { title1: string; title2: string; body: string }) {
   return (
     <section className="mt-24">
@@ -219,10 +167,10 @@ export function EdgeBanner({ title1, title2, body }: { title1: string; title2: s
 
 export function LandingCTA({ title, body }: { title: string; body: string }) {
   return (
-    <section className="mt-24 rounded-3xl border border-fd-border p-10 text-center">
+    <section className="mt-24 rounded-3xl border border-fd-border px-6 py-10 text-center sm:p-10">
       <h2 className="m-0 text-[24px] font-bold">{title}</h2>
       <p className="mx-auto mt-3 max-w-[440px] text-[15px] text-fd-muted-foreground">{body}</p>
-      <div className="mt-6 flex justify-center gap-3">
+      <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
         <a href="https://app.docs.dev" className={pill}>
           Get started free
         </a>

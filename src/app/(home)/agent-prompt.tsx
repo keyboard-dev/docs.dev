@@ -30,7 +30,7 @@ export function AgentPrompt() {
         Or paste this into Claude Code
       </p>
       <div className="flex items-start gap-2 rounded-2xl border border-[#6366f1]/40 bg-fd-card p-4 shadow-[0_0_24px_rgba(99,102,241,0.1)]">
-        <code className="min-w-0 flex-1 font-mono text-[13px] leading-relaxed text-fd-muted-foreground">
+        <code className="min-w-0 flex-1 break-words font-mono text-[13px] leading-relaxed text-fd-muted-foreground">
           {PROMPT}
         </code>
         <button
