@@ -125,6 +125,22 @@ export function CardGrid({
   );
 }
 
+export function VideoShowcase({ videoId, title }: { videoId: string; title: string }) {
+  return (
+    <div className="relative mt-8 aspect-video w-full overflow-hidden rounded-3xl border border-fd-border shadow-[0_0_32px_rgba(99,102,241,0.12)]">
+      <iframe
+        src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+        title={title}
+        loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+        referrerPolicy="strict-origin-when-cross-origin"
+        className="absolute inset-0 h-full w-full border-0"
+      />
+    </div>
+  );
+}
+
 export function Compare({ leftLabel, left, rightLabel, right }: { leftLabel: string; left: string; rightLabel: string; right: string }) {
   return (
     <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
