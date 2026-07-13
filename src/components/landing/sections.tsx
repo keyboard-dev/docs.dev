@@ -58,8 +58,8 @@ export function LandingHero({
           GitHub ↗
         </a>
       </div>
-      {videoId && <VideoShowcase videoId={videoId} title={videoTitle ?? headline1} />}
       <AgentPrompt />
+      {videoId && <VideoShowcase videoId={videoId} title={videoTitle ?? headline1} />}
     </section>
   );
 }
