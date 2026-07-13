@@ -71,10 +71,11 @@ pnpm dev        # http://localhost:3000
   and a code block).
 - `/docs` — the standard Fumadocs docs site (search, nav, MDX).
 
-Don't want a landing page? Uncomment the `HOME_REDIRECT_TO_DOCS` var in
-`wrangler.jsonc` and `/` redirects straight to `/docs` on the next deploy
-(it's a plain-text var; on other hosts set the same name as a build-time
-env var).
+Don't want a landing page? Set the `HOME_REDIRECT_TO_DOCS` var to `true` —
+it's one of the options the Deploy to Cloudflare button offers on first
+deploy, and can be flipped any time in `wrangler.jsonc` or the Worker's
+dashboard settings — and `/` redirects straight to `/docs`. On other hosts
+set the same name as a build-time env var.
 
 ## Deploy
 

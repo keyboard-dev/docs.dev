@@ -23,9 +23,11 @@ generateContentManifest();
 const buildInfo = getBuildInfo();
 
 // OPTIONAL — skip the landing page. When HOME_REDIRECT_TO_DOCS is truthy
-// (wrangler.jsonc `vars`, or a build-time env var on other hosts) the index
-// route redirects straight to /docs. Baked at build time because `/` is
-// statically prerendered; flipping it takes effect on the next deploy.
+// (wrangler.jsonc `vars`, or a build-time env var) the index route redirects
+// straight to /docs. On Cloudflare, worker.js also enforces this at request
+// time (covering values set on the Worker rather than in the file); this
+// baked redirect is what makes the same switch work on non-Worker hosts
+// (Netlify, `next start`) where worker.js never runs.
 const homeRedirectsToDocs = /^(1|true|yes)$/i.test(readWranglerVar('HOME_REDIRECT_TO_DOCS') ?? '');
 
 const withMDX = createMDX();
