@@ -18,6 +18,13 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // OPTIONAL — don't want a landing page? Uncomment and the index route `/`
+  // redirects straight to /docs. Plain text, not a secret. Read at build
+  // time (next.config.mjs), so it takes effect on the next push/deploy;
+  // remove it (or set "false") to bring the landing page back.
+  // "vars": {
+  //   "HOME_REDIRECT_TO_DOCS": "true"
+  // },
   // Workers AI powers the editor's "Generate with AI" (docs writing) and
   // image generation. Models overridable via AI_TEXT_MODEL / AI_IMAGE_MODEL.
   "ai": {

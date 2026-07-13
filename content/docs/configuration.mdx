@@ -16,6 +16,7 @@ local development, put secrets in a `.dev.vars` file (never committed).
 | `DOCSDEV_SITE_ID` | Enables [team sign-in](/docs/team). When set, it's the only sign-in method. Empty = standalone mode. |
 | `DOCSDEV_ISSUER` | The docs.dev service origin (leave the default unless self-hosting the service). |
 | `AI_TEXT_MODEL` / `AI_IMAGE_MODEL` | Override the [Workers AI models](/docs/ai) used by the editor. |
+| `HOME_REDIRECT_TO_DOCS` | Set to `"true"` to skip the landing page — `/` redirects straight to `/docs`. Unlike the vars above it is read at **build** time, so it applies on the next push/deploy. |
 
 ## Secrets
 

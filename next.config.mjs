@@ -3,6 +3,7 @@ import { generateApiDocs } from './scripts/generate-api-docs.mjs';
 import { generateContentManifest } from './scripts/gen-content-manifest.mjs';
 import { generateRepoInfo } from './scripts/gen-repo-info.mjs';
 import { getBuildInfo } from './scripts/build-info.mjs';
+import { readWranglerVar } from './scripts/wrangler-vars.mjs';
 
 // Detect which GitHub repo this checkout is (Deploy-to-Cloudflare copies,
 // moved clones) so the editor publishes to the right place with zero config.
@@ -20,6 +21,12 @@ generateContentManifest();
 // Which commit this build serves — inlined so the deployed Worker can report
 // it back (deploy-status polling compares it against a just-published commit).
 const buildInfo = getBuildInfo();
+
+// OPTIONAL — skip the landing page. When HOME_REDIRECT_TO_DOCS is truthy
+// (wrangler.jsonc `vars`, or a build-time env var on other hosts) the index
+// route redirects straight to /docs. Baked at build time because `/` is
+// statically prerendered; flipping it takes effect on the next deploy.
+const homeRedirectsToDocs = /^(1|true|yes)$/i.test(readWranglerVar('HOME_REDIRECT_TO_DOCS') ?? '');
 
 const withMDX = createMDX();
 
@@ -43,6 +50,11 @@ const config = {
   // Agent-friendly markdown aliases: append `.md` to any docs URL to get the
   // page as raw markdown (the convention agents and LLM tooling expect).
   // Serves the same content as /llms.mdx/docs/<slug>/content.md.
+  // Temporary (307), not permanent: bringing the landing page back must not
+  // fight redirects cached by browsers.
+  async redirects() {
+    return homeRedirectsToDocs ? [{ source: '/', destination: '/docs', permanent: false }] : [];
+  },
   async rewrites() {
     return [
       { source: '/docs.md', destination: '/llms.mdx/docs/content.md' },
