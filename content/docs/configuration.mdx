@@ -16,6 +16,7 @@ local development, put secrets in a `.dev.vars` file (never committed).
 | `DOCSDEV_SITE_ID` | Enables [team sign-in](/docs/team). When set, it's the only sign-in method. Empty = standalone mode. |
 | `DOCSDEV_ISSUER` | The docs.dev service origin (leave the default unless self-hosting the service). |
 | `AI_TEXT_MODEL` / `AI_IMAGE_MODEL` | Override the [Workers AI models](/docs/ai) used by the editor. |
+| `HOME_REDIRECT_TO_DOCS` | Set to `"true"` to skip the landing page — `/` redirects straight to `/docs`. Offered as an option when you first deploy with the Deploy to Cloudflare button; change it later in `wrangler.jsonc` (applies on the next push) or in the dashboard (applies immediately). |
 
 ## Secrets
 

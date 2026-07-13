@@ -1,7 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "docsdotdev",
-  "main": ".open-next/worker.js",
+  // Thin wrapper around .open-next/worker.js — see worker.js for why
+  // (request-time HOME_REDIRECT_TO_DOCS handling).
+  "main": "worker.js",
   "compatibility_date": "2025-03-25",
   // The site must be reachable the moment it deploys: keep the production
   // <worker>.<subdomain>.workers.dev URL and per-version preview URLs
@@ -17,6 +19,17 @@
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
+  },
+  // Plain-text options. Declared here (not just documented) so the Deploy to
+  // Cloudflare button presents them on the first-deploy setup page — the
+  // description each option shows there lives in package.json under
+  // `cloudflare.bindings`.
+  "vars": {
+    // Don't want a landing page? Set "true" and the index route `/`
+    // redirects straight to /docs. Checked at request time by worker.js, so
+    // it applies on the next deploy after changing it here (or immediately
+    // when edited in the dashboard). Set "false" to bring the landing back.
+    "HOME_REDIRECT_TO_DOCS": "false"
   },
   // Workers AI powers the editor's "Generate with AI" (docs writing) and
   // image generation. Models overridable via AI_TEXT_MODEL / AI_IMAGE_MODEL.
@@ -54,7 +67,8 @@
   //                                user authorization, install on the repo)
   //   TAVILY_API_KEY or BRAVE_API_KEY — optional web search grounding for
   //                                "Generate with AI" (skipped when unset)
-  // The ONE field the Deploy to Cloudflare button asks about. Creating a
+  // The one SECRET the Deploy to Cloudflare button asks about (it also
+  // surfaces the plain-text `vars` above). Creating a
   // site at app.docs.dev first hands you a site token (dst_…) — paste it in
   // during the button flow and the deployed site binds itself to your team
   // automatically. Leave blank if you didn't start there (connect later

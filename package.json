@@ -6,6 +6,9 @@
     "bindings": {
       "DOCSDEV_SITE_TOKEN": {
         "description": "Site token from your app.docs.dev dashboard (starts with dst_). Paste it to bind this site to your team automatically. Not starting from app.docs.dev? Enter: unset — you can connect from /admin later."
+      },
+      "HOME_REDIRECT_TO_DOCS": {
+        "description": "Don't want a landing page? Enter `true` and the site's index route `/` will redirect straight to `/docs`. Leave as `false` to keep the landing page (you can change this later in wrangler.jsonc or the dashboard)."
       }
     }
   },
