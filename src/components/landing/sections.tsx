@@ -22,11 +22,15 @@ export function LandingHero({
   headline1,
   headline2,
   subhead,
+  videoId,
+  videoTitle,
 }: {
   eyebrow: string;
   headline1: string;
   headline2: string;
   subhead: string;
+  videoId?: string;
+  videoTitle?: string;
 }) {
   return (
     <section className="relative pt-20 pb-14">
@@ -54,6 +58,7 @@ export function LandingHero({
           GitHub ↗
         </a>
       </div>
+      {videoId && <VideoShowcase videoId={videoId} title={videoTitle ?? headline1} />}
       <AgentPrompt />
     </section>
   );
