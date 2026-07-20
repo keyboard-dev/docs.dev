@@ -6,6 +6,7 @@
  * visiting /admin while signed in just offers "open your docs" and sign-out.
  */
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 const ACCENT = 'var(--docsdev-accent, #c2571f)';
@@ -208,12 +209,12 @@ export default function AdminPage() {
       <p style={{ color: '#8a857a', marginBottom: 20 }}>
         You’re signed in — open any page and hit “Edit page” to edit it in place.
       </p>
-      <a
+      <Link
         href="/docs"
         style={{ ...field, display: 'inline-block', border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, textDecoration: 'none' }}
       >
         Open your docs →
-      </a>
+      </Link>
     </main>
   );
 }
