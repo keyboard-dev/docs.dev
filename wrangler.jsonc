@@ -65,6 +65,13 @@
   //   GITHUB_APP_CLIENT_SECRET     register a GitHub App with callback URL
   //                                <site>/api/auth/github/callback, enable
   //                                user authorization, install on the repo)
+  //   READER_PIN                — reading PIN for pages marked
+  //                               `protected: true` (grants reading only —
+  //                               share it with users, not editors; requires
+  //                               ADMIN_SECRET; unset = protected pages stay
+  //                               locked to signed-in team members and
+  //                               invite-link holders — editors mint invite
+  //                               links from the page's lock toggle)
   //   TAVILY_API_KEY or BRAVE_API_KEY — optional web search grounding for
   //                                "Generate with AI" (skipped when unset)
   // The one SECRET the Deploy to Cloudflare button asks about (it also

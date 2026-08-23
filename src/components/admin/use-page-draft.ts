@@ -219,6 +219,15 @@ export function usePageDraft(slug: string) {
       setPublished(draftRef.current);
       setStatus('Published ✓ — deploying…');
 
+      // Protected pages have no public markdown mirror, so there's nothing
+      // to poll for deploy detection — the commit is in; the deploy lands on
+      // its own.
+      const fm = draftRef.current.match(/^---\n[\s\S]*?\n---/)?.[0] ?? '';
+      if (/^protected:\s*true/m.test(fm)) {
+        setStatus('Published ✓ — deploying… (protected page; live-check is off)');
+        return;
+      }
+
       // Poll the built page until the deploy lands.
       stopLivePoll();
       const startedAt = Date.now();

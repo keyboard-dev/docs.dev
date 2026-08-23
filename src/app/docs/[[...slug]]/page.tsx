@@ -12,6 +12,8 @@ import { getMDXComponents } from '@/components/mdx';
 import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { gitConfig } from '@/lib/shared';
+import { isProtectedSlug } from '@/lib/protect';
+import { ProtectedContent } from '@/components/protected-content';
 import { DraftShellNotice } from '@/components/admin/draft-shell-notice';
 import { openapi } from '@/lib/openapi';
 import { OpenAPIPage } from '@/components/openapi-page';
@@ -43,6 +45,23 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
     );
   }
 
+  // Protection gate. A protected page prerenders as this lock shell — the
+  // content is never part of the static page; readers fetch it from
+  // /api/reader/content, which checks the reader cookie, an invite link, or
+  // a team session on the server. See src/lib/protect.ts.
+  if (isProtectedSlug(page.slugs)) {
+    return (
+      <DocsPage toc={[]}>
+        <DocsTitle>{page.data.title}</DocsTitle>
+        <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
+        <div className="flex flex-row gap-2 items-center border-b pb-6" />
+        <DocsBody>
+          <ProtectedContent slug={page.slugs.join('/')} />
+        </DocsBody>
+      </DocsPage>
+    );
+  }
+
   const MDX = page.data.body;
   const markdownUrl = getPageMarkdownUrl(page).url;
 
@@ -56,6 +75,8 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
       <div className="flex flex-row gap-2 items-center border-b pb-6">
+        {/* Protected pages never reach this branch — they have no public
+            markdown mirror to link to. */}
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover
           markdownUrl={markdownUrl}

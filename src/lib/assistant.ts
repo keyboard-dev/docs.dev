@@ -14,6 +14,7 @@
 
 import { aiMocked, TEXT_MODEL, workersAI } from '@/lib/ai';
 import { findDocPage, searchDocPages, type DocSearchResult } from '@/lib/docs-index';
+import { isProtectedSlug } from '@/lib/protect';
 import { logQuestion } from '@/lib/insights';
 import { getLLMText, source } from '@/lib/source';
 import { appName } from '@/lib/shared';
@@ -46,7 +47,7 @@ async function buildContext(question: string): Promise<{ sources: DocSearchResul
   // index page so the model can still describe what the docs cover.
   if (sources.length === 0) {
     const index = source.getPage([]);
-    if (index) {
+    if (index && !isProtectedSlug(index.slugs)) {
       sources = [];
       const body = await getLLMText(index);
       return { sources, context: body.slice(0, CONTEXT_CHARS_PER_PAGE) };

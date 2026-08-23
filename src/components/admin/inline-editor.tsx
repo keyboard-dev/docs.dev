@@ -224,7 +224,7 @@ function EditOverlay({ slug, onDone }: { slug: string; onDone: (source: string, 
         source != null &&
         createPortal(
           mode === 'edit' ? (
-            <EditableDoc key={`${slug}:${revision}`} source={source} onChange={onChange} />
+            <EditableDoc key={`${slug}:${revision}`} slug={slug} source={source} onChange={onChange} />
           ) : (
             <PreviewInPlace source={previewSource} />
           ),
