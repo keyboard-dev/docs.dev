@@ -1,0 +1,85 @@
+---
+title: Protected pages
+description: Lock individual pages behind a reading PIN or shareable invite links — without hiding them from your own team.
+---
+
+Some pages aren't for everyone: internal runbooks, pre-launch specs, notes
+for a single customer. Mark a page **protected** and it stays on your site —
+title and description visible in the sidebar — but its content is only served
+to readers who can open it.
+
+## Protect a page
+
+In the editor, use the **Protect** toggle at the top of the page (next to
+where the copy-markdown buttons appear on the published page), then publish.
+The toggle writes `protected: true` into the page's frontmatter, so you can
+also set it by hand or from an agent:
+
+```mdx
+---
+title: Internal runbook
+description: On-call procedures for the docs site.
+protected: true
+---
+```
+
+A protected page is built as a *lock shell*: the static HTML carries only the
+title, description, and an unlock form — never the content. The content is
+served exclusively by the Worker after it checks, on the server, that the
+request is allowed. Signed-in editors and admins always see the page.
+
+## Share it with an invite link
+
+The lightest way to let someone in: next to the lock toggle, open
+**Invite…**, pick how long the link should last (7, 30, or 90 days, or no
+expiry), and the invite link is copied to your clipboard:
+
+```
+https://your-site.dev/docs/internal-runbook?invite=inv1.1767225600.9f2ab41c…
+```
+
+Send that link to whoever needs the page. Opening it unlocks **that one
+page** in their browser — no PIN, no account — and stays unlocked across
+refreshes and return visits, even after the `?invite=` part is dropped.
+
+A few properties worth knowing:
+
+- The hash is **bound to the page**: an invite minted for one page does
+  nothing on any other page.
+- Invites are **stateless** — nothing is stored server-side. There's no list
+  of issued links and no per-link revocation; expiry is the blast-radius
+  control, so prefer dated links for anything sensitive.
+- Rotating the `ADMIN_SECRET` secret **revokes every invite link** (and every
+  unlocked browser) at once.
+- Invite links only need `ADMIN_SECRET` to be set — they work even if you
+  never configure a reading PIN.
+
+## Or hand out the reading PIN
+
+For "everyone at the company may read these" situations, set a site-wide
+reading PIN:
+
+```bash
+wrangler secret put READER_PIN
+```
+
+Readers hitting a protected page get a PIN form; a correct PIN unlocks **all
+protected pages** in that browser for 30 days. The reading PIN grants reading
+only — it's deliberately separate from `ADMIN_PIN`, which signs editors in.
+
+With `READER_PIN` unset, protected pages fail closed: only signed-in team
+members and invite-link holders can read them.
+
+## What stays private
+
+Protection is enforced at the content door, not just the page:
+
+- **Search** still finds protected pages by title and description, but their
+  body text never enters the search index.
+- The raw-markdown mirrors (`.md` URLs, `/llms.mdx/...`) return 404 for
+  protected pages, and `llms.txt` / `llms-full.txt` skip them entirely.
+- The [AI assistant](/docs/ai) and the [MCP server](/docs/claude-code) can't
+  see them — they're excluded from retrieval, search, and reading.
+
+The title and one-line description remain public (they appear in the sidebar
+and lock shell), so keep those unrevealing on genuinely sensitive pages.

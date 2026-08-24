@@ -50,6 +50,7 @@ import {
   List,
   ListOrdered,
   Lock,
+  LockOpen,
   Minus,
   Plus,
   Quote as QuoteIcon,
@@ -111,6 +112,9 @@ function setMetaLine(fm: string, key: string, val: string): string {
   if (new RegExp(`^${key}:`, 'm').test(fm)) return fm.replace(new RegExp(`^${key}:.*$`, 'm'), `${key}: ${val}`);
   if (/\n---\n?$/.test(fm)) return fm.replace(/\n---\n?$/, `\n${key}: ${val}\n---\n`);
   return `---\n${key}: ${val}\n---\n`;
+}
+function removeMetaLine(fm: string, key: string): string {
+  return fm.replace(new RegExp(`^${key}:.*$\\n?`, 'm'), '');
 }
 
 /** Place the caret inside `el` at start/end/char offset. */
@@ -1033,7 +1037,7 @@ const PALETTE: Array<{ type: string; label: string; icon: ReactNode }> = [
 
 type BlockRect = { index: number; top: number; bottom: number };
 
-export function EditableDoc({ source, onChange }: { source: string; onChange: (next: string) => void }) {
+export function EditableDoc({ slug, source, onChange }: { slug: string; source: string; onChange: (next: string) => void }) {
   const initial = useMemo(() => parseDoc(source), [source]);
   const [frontmatter, setFrontmatter] = useState(initial.frontmatter);
   const [blocks, setBlocks] = useState<Block[]>(initial.blocks);
@@ -1187,6 +1191,47 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
     setFrontmatter(fm);
     emit({ frontmatter: fm, blocks: stateRef.current.blocks });
   };
+  /** Reading-PIN protection rides in frontmatter as `protected: true`. */
+  const isProtected = metaLine(frontmatter, 'protected') === 'true';
+  const setProtected = (on: boolean) => {
+    const fm = on
+      ? setMetaLine(stateRef.current.frontmatter, 'protected', 'true')
+      : removeMetaLine(stateRef.current.frontmatter, 'protected');
+    setFrontmatter(fm);
+    emit({ frontmatter: fm, blocks: stateRef.current.blocks });
+  };
+
+  /** Invite links: signed per-page tokens minted by /api/admin/invite —
+   *  append to the page URL and share; holders read this page without the
+   *  PIN. See src/lib/protect.ts. */
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  async function copyInvite(days: number | null) {
+    if (inviteBusy) return;
+    setInviteBusy(true);
+    try {
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug, days }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; url?: string; error?: string };
+      if (!res.ok || !data.url) throw new Error(data.error ?? 'Could not create the invite link.');
+      setInviteOpen(false);
+      try {
+        await navigator.clipboard.writeText(data.url);
+        notify(days ? `Invite link copied — valid for ${days} days.` : 'Invite link copied — no expiry.');
+      } catch {
+        // Clipboard can be blocked (permissions, non-secure context) — hand
+        // the link over in a prompt instead.
+        window.prompt('Copy the invite link:', data.url);
+      }
+    } catch (err) {
+      notify((err as Error).message);
+    } finally {
+      setInviteBusy(false);
+    }
+  }
 
   function newBlock(type: string): Block {
     const id = newId();
@@ -1896,6 +1941,7 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
       onClick={() => {
         setSelFig(null);
         setInsertAt(null);
+        setInviteOpen(false);
       }}
     >
       <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); e.target.value = ''; }} />
@@ -1924,10 +1970,72 @@ export function EditableDoc({ source, onChange }: { source: string; onChange: (n
         {metaLine(frontmatter, 'description')}
       </p>
       {/* Ghost of the published page's copy-markdown row, so the content
-          below starts at exactly the same y as the real page. */}
-      <div className="flex flex-row gap-2 items-center border-b pb-6" aria-hidden style={{ pointerEvents: 'none' }}>
-        <div style={{ height: 30, width: 132, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5 }} />
-        <div style={{ height: 30, width: 74, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5 }} />
+          below starts at exactly the same y as the real page — plus the
+          protection lock toggle and invite-link menu on the right. */}
+      <div className="flex flex-row gap-2 items-center border-b pb-6">
+        <div aria-hidden style={{ height: 30, width: 132, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5, pointerEvents: 'none' }} />
+        <div aria-hidden style={{ height: 30, width: 74, borderRadius: 8, background: 'var(--color-fd-muted)', opacity: 0.5, pointerEvents: 'none' }} />
+        <span style={{ flex: 1 }} />
+        {isProtected && (
+          <span style={{ position: 'relative' }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setInviteOpen((v) => !v);
+              }}
+              title="Create a shareable invite link — anyone with the link can read this page without the reading PIN."
+              className="dd-chip-btn"
+              data-on={inviteOpen ? 'true' : undefined}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, border: '1px solid var(--color-fd-border)' }}
+            >
+              <LinkIcon size={11} />
+              Invite…
+            </button>
+            {inviteOpen && (
+              <div
+                className="dd-pop"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 95,
+                  display: 'flex', flexDirection: 'column', gap: 2, padding: 6, width: 200,
+                }}
+              >
+                <div style={{ fontSize: 11, color: 'var(--color-fd-muted-foreground)', padding: '2px 6px 4px' }}>
+                  Copy an invite link, valid for…
+                </div>
+                {([['7 days', 7], ['30 days', 30], ['90 days', 90], ['No expiry', null]] as const).map(([label, days]) => (
+                  <button
+                    key={label}
+                    className="dd-chip-btn"
+                    disabled={inviteBusy}
+                    style={{ textAlign: 'left', opacity: inviteBusy ? 0.6 : 1 }}
+                    onClick={() => void copyInvite(days)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </span>
+        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setInviteOpen(false);
+            setProtected(!isProtected);
+          }}
+          title={
+            isProtected
+              ? 'Readers need the reading PIN or an invite link to view this page. Click to make it public again.'
+              : 'Protect this page — readers need the reading PIN (READER_PIN secret) or an invite link you generate to view it.'
+          }
+          className="dd-chip-btn"
+          data-on={isProtected ? 'true' : undefined}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, border: '1px solid var(--color-fd-border)' }}
+        >
+          {isProtected ? <Lock size={11} /> : <LockOpen size={11} />}
+          {isProtected ? 'Protected' : 'Protect'}
+        </button>
       </div>
 
       {/* Blocks are DIRECT children of the same .prose container the published

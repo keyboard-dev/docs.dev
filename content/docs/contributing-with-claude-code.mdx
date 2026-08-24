@@ -1,0 +1,105 @@
+---
+title: Contributing with Claude Code
+description: The step-by-step workflow for adding and updating docs from your terminal with local Claude Code.
+---
+
+Your docs are MDX files in a git repository, which makes local
+[Claude Code](https://claude.com/claude-code) a first-class way to write
+them. This page is the practical workflow — for the reasoning behind it, see
+[Why docs.dev + Claude Code](/docs/claude-code).
+
+## One-time setup
+
+Clone your docs repo, install dependencies, and start Claude Code inside it:
+
+```bash
+git clone https://github.com/<you>/<your-docs-repo>
+cd <your-docs-repo>
+pnpm install
+claude
+```
+
+(Need Claude Code itself? `npm install -g @anthropic-ai/claude-code`, then
+sign in once with `claude`.)
+
+That's the whole setup. The repo ships a `CLAUDE.md` agent guide that Claude
+reads on session start — where pages live, required frontmatter, slug rules,
+how the sidebar is ordered, which commands verify a change — so you don't
+need to explain the conventions in your prompt, and neither does a teammate
+contributing for the first time.
+
+## Ask for the page you want
+
+Describe the documentation you need in plain language:
+
+```
+> add a troubleshooting page for common deploy errors and link it from getting started
+> document the retry behavior of the webhooks API — the source is src/webhooks/
+> our SDK renamed client.connect() to client.open() — update every code sample
+```
+
+For a brand-new page, the repo ships a `/new-page` skill that does the chore
+end to end — valid kebab-case slug, frontmatter, a `content/docs/<slug>.mdx`
+file, the sidebar entry in `meta.json`, and a passing type check:
+
+```
+> /new-page Rate limits
+```
+
+You can also just say "add a page about rate limits" — Claude will reach for
+the skill on its own.
+
+## Verify before you ship
+
+Two checks catch nearly everything, and Claude runs them itself when asked
+to finish a change properly:
+
+```bash
+pnpm types:check   # validates frontmatter + MDX across the whole site
+pnpm dev           # local preview at http://localhost:3000/docs/<slug>
+```
+
+If you only remember one instruction, make it *"run the checks before you
+push."* A page that passes `types:check` will build; what's left is judgment
+— load the preview and read what was written.
+
+## Pick a review path, then ship
+
+Publishing is a git operation, so choose how much review you want:
+
+- **Push to the default branch** — deploys in about a minute via your
+  Cloudflare CI. Right for typo fixes and small updates you'd self-approve
+  anyway.
+- **Open a pull request** — ask Claude to "put this on a branch and open a
+  PR" and review the diff like code.
+- **Draft for a rendered review** — use the `/draft-page` skill instead of
+  committing. The page lands in the site's shared-drafts store, where anyone
+  signed in to the [editor](/docs/editing) previews it rendered at its
+  future URL, polishes it in place, and clicks **Publish** (or discards it).
+  Best when the reviewer would rather read a page than a diff.
+- **Review a branch from the editor** — if Claude pushed pages to a branch,
+  the editor's **Branches…** panel lists every docs page the branch touches
+  and lets a reviewer load, edit, and publish each one without leaving the
+  site.
+
+Whichever path you take, what lands on the default branch is what deploys —
+editor publishes, agent commits, and hand-written pages all merge in git
+with no CMS state to fall out of sync.
+
+## The conventions, if you're curious
+
+You can contribute without memorizing any of this — it's what `CLAUDE.md`
+teaches Claude — but for orientation:
+
+| Convention | Rule |
+| --- | --- |
+| Page files | `content/docs/<slug>.mdx`; the URL is the file path (`getting-started.mdx` → `/docs/getting-started`) |
+| Frontmatter | `title` and `description` are required |
+| Headings | The H1 comes from `title`; start body headings at `##` |
+| Slugs | Lowercase kebab-case — `[a-z0-9-]`, with `/` for nesting |
+| Sidebar | Ordered by `content/docs/meta.json`; new pages need an entry |
+| Images | Put files in `public/uploads/`, reference as `/uploads/<name>.png` |
+
+A useful habit for anything beyond a page edit: end your request with *"and
+make sure `pnpm types:check` passes."* Claude treats it as part of the task,
+and broken MDX never leaves the session.

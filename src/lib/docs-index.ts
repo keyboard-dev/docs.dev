@@ -1,10 +1,16 @@
 /**
  * Read-side index over the published docs, shared by the AI assistant
- * (retrieval) and the MCP server (search/read tools). Everything works from
- * the fumadocs source, so it runs on Cloudflare Workers with no filesystem.
+ * (retrieval), the MCP server (search/read tools), and llms.txt. Everything
+ * works from the fumadocs source, so it runs on Cloudflare Workers with no
+ * filesystem.
+ *
+ * Protected pages (see src/lib/protect.ts) are invisible here — listed,
+ * searched, and read as if they didn't exist — so their content can't leak
+ * through the assistant, MCP tools, or the llms.txt index.
  */
 
 import { getLLMText, getPageMarkdownUrl, source } from '@/lib/source';
+import { isProtectedSlug } from '@/lib/protect';
 
 export type DocPageInfo = {
   title: string;
@@ -32,8 +38,12 @@ function pageInfo(page: Page): DocPageInfo {
   };
 }
 
+function readablePages(): Page[] {
+  return source.getPages().filter((page) => !isProtectedSlug(page.slugs));
+}
+
 export function listDocPages(): DocPageInfo[] {
-  return source.getPages().map(pageInfo);
+  return readablePages().map(pageInfo);
 }
 
 /** Look a page up by its HTML url, markdown url, or bare slug path. */
@@ -44,7 +54,8 @@ export function findDocPage(path: string): Page | undefined {
   if (segments[0] === 'llms.mdx') segments.shift();
   if (segments[0] === 'docs') segments.shift();
   if (segments.at(-1) === 'content') segments.pop();
-  return source.getPage(segments);
+  const page = source.getPage(segments);
+  return page && isProtectedSlug(page.slugs) ? undefined : page;
 }
 
 export async function getDocPageMarkdown(path: string): Promise<{ info: DocPageInfo; markdown: string } | undefined> {
@@ -67,7 +78,7 @@ export async function searchDocPages(query: string, limit = 5): Promise<DocSearc
   if (terms.length === 0) return [];
 
   const scored = await Promise.all(
-    source.getPages().map(async (page) => {
+    readablePages().map(async (page) => {
       const info = pageInfo(page);
       const body = await getLLMText(page);
       const bodyLower = body.toLowerCase();

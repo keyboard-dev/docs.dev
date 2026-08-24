@@ -38,7 +38,7 @@ export function DocEditor({ slug, onDone }: { slug: string; onDone?: () => void 
         </span>
       </header>
       <main style={{ maxWidth: 760, margin: '0 auto', padding: '44px 24px 160px' }}>
-        {source == null ? <p style={{ color: '#aaa' }}>Loading…</p> : <EditableDoc key={`${slug}:${revision}`} source={source} onChange={onChange} />}
+        {source == null ? <p style={{ color: '#aaa' }}>Loading…</p> : <EditableDoc key={`${slug}:${revision}`} slug={slug} source={source} onChange={onChange} />}
       </main>
     </div>
   );
